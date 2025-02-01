@@ -2769,7 +2769,7 @@ simpleCondition
     ;
 
 classCondition
-    : identifier IS? NOT? EQUALS? 'NOT EQUALS'? (
+    : identifier IS? NOT? EQUALS? (
         NUMERIC
         | ALPHABETIC
         | ALPHABETIC_LOWER
@@ -5413,20 +5413,8 @@ COMMACHAR
     : ','
     ;
 
-COMMENT_1
-    : '**' ~[\r\n]* -> skip
-    ;
-
-COMMENT_2
-    : '*' ~[*\r\n]* '*' ~[a-zA-Z0-9\r\n]* ('\r'? '\n') -> skip
-    ;
-
-COMMENT_3
-    : '*' ~[\r\n]* ('\r'? '\n') -> skip
-    ;
-
-COMMENT_4
-    : '*> ' ~[\r\n]* ('\r'? '\n') -> skip
+SKIP_COMMENT
+    : '*' ~[\r\n]* [\r\n]+ -> skip
     ;
 
 COMMENTENTRYTAG

@@ -209,8 +209,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(authorContext).to.not.be.null;
     expect(authorContext.childCount).to.be.greaterThan(0);
 
-    const authorNameNode = authorContext.authorName();
-    const authorName = authorNameNode.getChild(0).text;
+    const authorName = authorContext.authorName().text;
     expect(authorName).equal("JohnDoe");
   });
 
@@ -221,8 +220,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(authorContext).to.not.be.null;
     expect(authorContext.childCount).to.be.greaterThan(0);
 
-    const authorNameNode = authorContext.authorName();
-    const authorName = authorNameNode.getChild(0).text;
+    const authorName = authorContext.authorName().text;
     expect(authorName).equal("JohnDoe");
   });
 
@@ -233,8 +231,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(dateWrittenContext).to.not.be.null;
     expect(dateWrittenContext.childCount).to.be.greaterThan(0);
 
-    const dateWrittenNode = dateWrittenContext.dateIdentifier();
-    const dateWritten = dateWrittenNode.children?.join("");
+    const dateWritten = dateWrittenContext.dateIdentifier().text;
     expect(dateWritten).equal("28/10/21");
   });
 
@@ -245,8 +242,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(dateWrittenContext).to.not.be.null;
     expect(dateWrittenContext.childCount).to.be.greaterThan(0);
 
-    const dateWrittenNode = dateWrittenContext.dateIdentifier();
-    const dateWritten = dateWrittenNode.children?.join("");
+    const dateWritten = dateWrittenContext.dateIdentifier().text;
     expect(dateWritten).equal("28/10/2021");
   });
 
@@ -257,8 +253,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(dateWrittenContext).to.not.be.null;
     expect(dateWrittenContext.childCount).to.be.greaterThan(0);
 
-    const dateWrittenNode = dateWrittenContext.dateIdentifier();
-    const dateWritten = dateWrittenNode.children?.join("");
+    const dateWritten = dateWrittenContext.dateIdentifier().text;
     expect(dateWritten).equal("28/10/2021");
   });
 
@@ -284,11 +279,11 @@ suite("Visual COBOL Grammar Tests for parser", () => {
 
     expect(paragraph).to.not.be.null;
 
-    const paragraphNameNode = paragraph.paragraphName();
-    expect(paragraphNameNode.getChild(0).text).to.be.equal("0000-MAIN-ROUTINE");
+    const paragraphName = paragraph.paragraphName().text;
+    expect(paragraphName).to.be.equal("0000-MAIN-ROUTINE");
 
-    const paragraphExitNode = paragraph.paragraphExit();
-    expect(paragraphExitNode?.getChild(0).text).to.be.equal("0000-EXIT");
+    const paragraphExit = paragraph.paragraphExit()?.text;
+    expect(paragraphExit).to.be.equal("0000-EXIT.");
   });
 
   test("should parse the lastParagraph correctly", () => {
@@ -314,9 +309,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(classCondition).to.not.be.null;
     expect(classCondition.getChild(0).text).to.be.equal("RESULT");
     expect(classCondition.getChild(1).text).to.be.equal("EQUALS");
-    expect(classCondition.figurativeConstant()?.getChild(0).text).to.be.equal(
-      "ZEROS"
-    );
+    expect(classCondition.figurativeConstant()?.text).to.be.equal("ZEROS");
   });
 
   test("should parse the classCondition with 'EQUALS SPACES' correctly", () => {
@@ -326,8 +319,6 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(classCondition).to.not.be.null;
     expect(classCondition.getChild(0).text).to.be.equal("RESULT");
     expect(classCondition.getChild(1).text).to.be.equal("EQUALS");
-    expect(classCondition.figurativeConstant()?.getChild(0).text).to.be.equal(
-      "SPACES"
-    );
+    expect(classCondition.figurativeConstant()?.text).to.be.equal("SPACES");
   });
 });

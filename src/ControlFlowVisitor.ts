@@ -154,6 +154,34 @@ export class ControlFlowVisitor
     this.visitChildren(ctx);
   }
 
+  visitPerformInlineStatement(
+    ctx: VisualCobolParser.PerformInlineStatementContext
+  ): void {
+    const performUntil = ctx.performType()?.performUntil();
+    if (performUntil) {
+      const nodeName =
+        "PERFORM " + this.getLeafNodeTexts(performUntil).join(" ");
+
+      let performUntilNode: Node = {
+        id: ctx.start.line.toString(),
+        label: nodeName,
+        type: NodeType.LOOP,
+        startLineNumber: ctx.start.line,
+        endLineNumber: ctx.stop ? ctx.stop.line : ctx.start.line,
+        callers: [],
+        callees: [],
+      };
+
+      const ancestor = this.getAncestor(ctx);
+      if (ancestor) {
+        this.addToMap(ancestor.paragraphName().text, performUntilNode.id);
+      }
+
+      this.nodes.push(performUntilNode);
+      this.visitChildren(ctx);
+    }
+  }
+
   private getLeafNodeTexts(leafNode: ParseTree): string[] {
     if (leafNode instanceof TerminalNode) {
       return [leafNode.text];

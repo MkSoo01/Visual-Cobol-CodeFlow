@@ -25,11 +25,19 @@ export interface Node {
   type: NodeType;
 }
 
+export interface Edge {
+  id: string;
+  source: string;
+  target: string;
+  isPolyline: boolean;
+}
+
 export class ControlFlowVisitor
   extends AbstractParseTreeVisitor<any>
   implements VisualCobolVisitor<any>
 {
   nodes: Node[] = [];
+  edges: Edge[] = [];
   callerMap = new Map<string, string[]>();
   calleeMap = new Map<string, string[]>();
 
@@ -221,9 +229,67 @@ export class ControlFlowVisitor
       );
 
       this.nodes.forEach((node) => {
-        console.log("Node: " + node.label);
+        console.log("Node: " + node.label + " ID: " + node.id);
       });
+
+      const startNode = this.nodes.find((node) => node.type === NodeType.START);
+
+      if (startNode) {
+        const lastNode = this.formEdge(
+          startNode.id,
+          startNode.callees
+            .map((callee) => {
+              const calleeObj = this.nodes.find(
+                (node) => node.label === callee || node.id === callee
+              );
+
+              return calleeObj;
+            })
+            .filter((node) => node !== undefined)
+        );
+
+        const endNode = this.nodes.find((node) => node.type === NodeType.END);
+        this.formEdge(lastNode, endNode ? [endNode] : []);
+      }
     }
+  }
+
+  private formEdge(source: string, target: Node[]): string {
+    for (let i = 0; i < target.length; i++) {
+      let targetNode = target[i];
+
+      const edge: Edge = {
+        id: source + "-" + targetNode.id,
+        source: source,
+        target: targetNode.id,
+        isPolyline: false,
+      };
+
+      if (this.edges.find((e) => e.id === edge.id)) {
+        continue;
+      }
+
+      this.edges.push(edge);
+      source = edge.target;
+
+      const newSource = this.formEdge(
+        source,
+        targetNode.callees
+          .map((callee) => {
+            const calleeObj = this.nodes.find(
+              (node) => node.label === callee || node.id === callee
+            );
+
+            return calleeObj;
+          })
+          .filter((node) => node !== undefined)
+      );
+
+      source = newSource;
+    }
+
+    const lastNode = source;
+    return lastNode;
   }
 
   private getAncestor(

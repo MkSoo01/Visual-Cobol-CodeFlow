@@ -38,6 +38,8 @@ export class ControlFlowVisitor
 {
   nodes: Node[] = [];
   edges: Edge[] = [];
+  displayNodes: Node[] = [];
+  duplicatedNodes: string[] = [];
   callerMap = new Map<string, string[]>();
   calleeMap = new Map<string, string[]>();
 
@@ -222,10 +224,24 @@ export class ControlFlowVisitor
         if (child.type === NodeType.NORMAL && child.callers.length === 0) {
           unusedNodes.push(child.id);
         }
+
+        if (child.callers.length > 1) {
+          const displayNodeWithMultipleCallerList =
+            this.createForNodeWithMultipleCallers(child);
+          this.displayNodes.push(...displayNodeWithMultipleCallerList);
+        } else {
+          this.displayNodes.push(child);
+        }
       });
 
       this.nodes = this.nodes.filter(
         (child) => !unusedNodes.includes(child.id)
+      );
+
+      this.displayNodes = this.displayNodes.filter(
+        (child) =>
+          !unusedNodes.includes(child.id) &&
+          !this.duplicatedNodes.includes(child.id)
       );
 
       this.nodes.forEach((node) => {
@@ -254,9 +270,101 @@ export class ControlFlowVisitor
     }
   }
 
+  private createForNodeWithMultipleCallers(node: Node): Node[] {
+    const result: Node[] = [];
+    const delimiter = "_";
+    const prefix = node.id + delimiter;
+    const callers = node.callers;
+    for (let i = 0; i < callers.length; i++) {
+      const caller = callers[i];
+
+      const newNode: Node = {
+        id: prefix + (i + 1).toString(),
+        label: node.label,
+        type: node.type,
+        startLineNumber: node.startLineNumber,
+        endLineNumber: node.endLineNumber,
+        callers: [caller],
+        callees: node.callees,
+      };
+
+      this.duplicatedNodes.push(node.id);
+      result.push(newNode);
+    }
+
+    result.push(
+      ...this.createCalleeNodesFrom(
+        [...node.callees],
+        callers.length,
+        delimiter
+      )
+    );
+
+    return result;
+  }
+
+  private createCalleeNodesFrom(
+    callees: string[],
+    numOfCallers: number,
+    delimiter: string
+  ): Node[] {
+    const result: Node[] = [];
+    if (callees.length > 0) {
+      const calleeNode = this.nodes.find(
+        (node) => node.label === callees[0] || node.id === callees[0]
+      );
+
+      if (calleeNode) {
+        for (let i = 0; i < numOfCallers; i++) {
+          const newCalleeId = calleeNode.id + delimiter + (i + 1);
+          const newCalleeNode: Node = {
+            id: newCalleeId,
+            label: calleeNode.label,
+            type: calleeNode.type,
+            startLineNumber: calleeNode.startLineNumber,
+            endLineNumber: calleeNode.endLineNumber,
+            callers: calleeNode.callers,
+            callees: calleeNode.callees,
+          };
+
+          this.duplicatedNodes.push(calleeNode.id);
+          result.push(newCalleeNode);
+          result.push(
+            ...this.createCalleeNodesFrom(
+              [...calleeNode.callees],
+              numOfCallers,
+              delimiter
+            )
+          );
+        }
+      }
+
+      callees.splice(0, 1);
+      result.push(
+        ...this.createCalleeNodesFrom(callees, numOfCallers, delimiter)
+      );
+    }
+
+    return result;
+  }
+
   private formEdge(source: string, target: Node[]): string {
     for (let i = 0; i < target.length; i++) {
       let targetNode = target[i];
+      let hasDup = false;
+
+      if (this.duplicatedNodes.includes(targetNode.id)) {
+        const dupTargetNode = this.displayNodes.find(
+          (node) =>
+            node.id.startsWith(targetNode.id) &&
+            !this.edges.find((e) => e.source === node.id)
+        );
+
+        if (dupTargetNode) {
+          targetNode = dupTargetNode;
+          hasDup = true;
+        }
+      }
 
       const edge: Edge = {
         id: source + "-" + targetNode.id,
@@ -270,20 +378,20 @@ export class ControlFlowVisitor
       }
 
       this.edges.push(edge);
+
+      const targetNodeCallees = targetNode.callees
+        .map((callee) => {
+          const calleeObj = this.nodes.find(
+            (node) => node.label === callee || node.id === callee
+          );
+
+          return calleeObj;
+        })
+        .filter((node) => node !== undefined);
+
       source = edge.target;
 
-      const newSource = this.formEdge(
-        source,
-        targetNode.callees
-          .map((callee) => {
-            const calleeObj = this.nodes.find(
-              (node) => node.label === callee || node.id === callee
-            );
-
-            return calleeObj;
-          })
-          .filter((node) => node !== undefined)
-      );
+      const newSource = this.formEdge(source, targetNodeCallees);
 
       source = newSource;
     }

@@ -1,6 +1,4 @@
-import { ErrorNode } from "antlr4ts/tree/ErrorNode";
 import { ParseTree } from "antlr4ts/tree/ParseTree";
-import { RuleNode } from "antlr4ts/tree/RuleNode";
 import { TerminalNode } from "antlr4ts/tree/TerminalNode";
 import * as VisualCobolParser from "./generated/VisualCobolParser";
 import { VisualCobolVisitor } from "./generated/VisualCobolVisitor";
@@ -25,23 +23,13 @@ export interface Node {
   type: NodeType;
 }
 
-export interface Edge {
-  id: string;
-  source: string;
-  target: string;
-  isPolyline: boolean;
-}
-
 export class ControlFlowVisitor
   extends AbstractParseTreeVisitor<any>
   implements VisualCobolVisitor<any>
 {
   nodes: Node[] = [];
-  edges: Edge[] = [];
-  displayNodes: Node[] = [];
-  duplicatedNodes: string[] = [];
-  callerMap = new Map<string, string[]>();
-  calleeMap = new Map<string, string[]>();
+  callerToCalleesMap = new Map<string, string[]>();
+  calleeToCallersMap = new Map<string, string[]>();
 
   protected defaultResult() {
     return;
@@ -49,7 +37,7 @@ export class ControlFlowVisitor
 
   visitParagraph(ctx: VisualCobolParser.ParagraphContext): void {
     const type: NodeType = NodeType.NORMAL;
-
+    //console.log(JSON.stringify(ctx, null, 2));
     let node: Node = {
       id: ctx.start.line.toString(),
       label: ctx.paragraphName().text,
@@ -104,6 +92,7 @@ export class ControlFlowVisitor
           callees: [],
         };
         this.nodes.push(exitNode);
+        this.addToMap(node.label, exitNode.label);
       }
     }
 
@@ -127,16 +116,16 @@ export class ControlFlowVisitor
 
   addToMap(caller: string | undefined, callee: string | undefined) {
     if (caller && callee) {
-      if (this.calleeMap.has(callee)) {
-        this.calleeMap.get(callee)?.push(caller);
+      if (this.calleeToCallersMap.has(callee)) {
+        this.calleeToCallersMap.get(callee)?.push(caller);
       } else {
-        this.calleeMap.set(callee, [caller]);
+        this.calleeToCallersMap.set(callee, [caller]);
       }
 
-      if (this.callerMap.has(caller)) {
-        this.callerMap.get(caller)?.push(callee);
+      if (this.callerToCalleesMap.has(caller)) {
+        this.callerToCalleesMap.get(caller)?.push(callee);
       } else {
-        this.callerMap.set(caller, [callee]);
+        this.callerToCalleesMap.set(caller, [callee]);
       }
     }
   }
@@ -215,22 +204,14 @@ export class ControlFlowVisitor
         if (child.type === NodeType.CONDITION || child.type === NodeType.LOOP) {
           key = child.id;
         }
-        const callees = this.callerMap.get(key);
-        const callers = this.calleeMap.get(key);
+        const callees = this.callerToCalleesMap.get(key);
+        const callers = this.calleeToCallersMap.get(key);
 
         child.callees = callees ? callees : [];
         child.callers = callers ? callers : [];
 
-        if (child.type === NodeType.NORMAL && child.callers.length === 0) {
+        if (child.type !== NodeType.START && child.callers.length === 0) {
           unusedNodes.push(child.id);
-        }
-
-        if (child.callers.length > 1) {
-          const displayNodeWithMultipleCallerList =
-            this.createForNodeWithMultipleCallers(child);
-          this.displayNodes.push(...displayNodeWithMultipleCallerList);
-        } else {
-          this.displayNodes.push(child);
         }
       });
 
@@ -238,180 +219,29 @@ export class ControlFlowVisitor
         (child) => !unusedNodes.includes(child.id)
       );
 
-      this.displayNodes = this.displayNodes.filter(
-        (child) =>
-          !unusedNodes.includes(child.id) &&
-          !this.duplicatedNodes.includes(child.id)
-      );
-
-      this.nodes.forEach((node) => {
-        console.log("Node: " + node.label + " ID: " + node.id);
-      });
-
-      const startNode = this.nodes.find((node) => node.type === NodeType.START);
-
-      if (startNode) {
-        const lastNode = this.formEdge(
-          startNode.id,
-          startNode.callees
-            .map((callee) => {
-              const calleeObj = this.nodes.find(
-                (node) => node.label === callee || node.id === callee
-              );
-
-              return calleeObj;
-            })
-            .filter((node) => node !== undefined)
-        );
-
-        const endNode = this.nodes.find((node) => node.type === NodeType.END);
-        this.formEdge(lastNode, endNode ? [endNode] : []);
+      const startNodeCount = this.nodes.filter(
+        (node) => node.type === NodeType.START
+      ).length;
+      const endNodeCount = this.nodes.filter(
+        (node) => node.type === NodeType.END
+      ).length;
+      if (startNodeCount < 1 || endNodeCount < 1) {
+        throw new Error("Missing start or end node");
       }
     }
-  }
-
-  private createForNodeWithMultipleCallers(node: Node): Node[] {
-    const result: Node[] = [];
-    const delimiter = "_";
-    const prefix = node.id + delimiter;
-    const callers = node.callers;
-    for (let i = 0; i < callers.length; i++) {
-      const caller = callers[i];
-
-      const newNode: Node = {
-        id: prefix + (i + 1).toString(),
-        label: node.label,
-        type: node.type,
-        startLineNumber: node.startLineNumber,
-        endLineNumber: node.endLineNumber,
-        callers: [caller],
-        callees: node.callees,
-      };
-
-      this.duplicatedNodes.push(node.id);
-      result.push(newNode);
-    }
-
-    result.push(
-      ...this.createCalleeNodesFrom(
-        [...node.callees],
-        callers.length,
-        delimiter
-      )
-    );
-
-    return result;
-  }
-
-  private createCalleeNodesFrom(
-    callees: string[],
-    numOfCallers: number,
-    delimiter: string
-  ): Node[] {
-    const result: Node[] = [];
-    if (callees.length > 0) {
-      const calleeNode = this.nodes.find(
-        (node) => node.label === callees[0] || node.id === callees[0]
-      );
-
-      if (calleeNode) {
-        for (let i = 0; i < numOfCallers; i++) {
-          const newCalleeId = calleeNode.id + delimiter + (i + 1);
-          const newCalleeNode: Node = {
-            id: newCalleeId,
-            label: calleeNode.label,
-            type: calleeNode.type,
-            startLineNumber: calleeNode.startLineNumber,
-            endLineNumber: calleeNode.endLineNumber,
-            callers: calleeNode.callers,
-            callees: calleeNode.callees,
-          };
-
-          this.duplicatedNodes.push(calleeNode.id);
-          result.push(newCalleeNode);
-          result.push(
-            ...this.createCalleeNodesFrom(
-              [...calleeNode.callees],
-              numOfCallers,
-              delimiter
-            )
-          );
-        }
-      }
-
-      callees.splice(0, 1);
-      result.push(
-        ...this.createCalleeNodesFrom(callees, numOfCallers, delimiter)
-      );
-    }
-
-    return result;
-  }
-
-  private formEdge(source: string, target: Node[]): string {
-    for (let i = 0; i < target.length; i++) {
-      let targetNode = target[i];
-      let hasDup = false;
-
-      if (this.duplicatedNodes.includes(targetNode.id)) {
-        const dupTargetNode = this.displayNodes.find(
-          (node) =>
-            node.id.startsWith(targetNode.id) &&
-            !this.edges.find((e) => e.source === node.id)
-        );
-
-        if (dupTargetNode) {
-          targetNode = dupTargetNode;
-          hasDup = true;
-        }
-      }
-
-      const edge: Edge = {
-        id: source + "-" + targetNode.id,
-        source: source,
-        target: targetNode.id,
-        isPolyline: false,
-      };
-
-      if (this.edges.find((e) => e.id === edge.id)) {
-        continue;
-      }
-
-      this.edges.push(edge);
-
-      const targetNodeCallees = targetNode.callees
-        .map((callee) => {
-          const calleeObj = this.nodes.find(
-            (node) => node.label === callee || node.id === callee
-          );
-
-          return calleeObj;
-        })
-        .filter((node) => node !== undefined);
-
-      source = edge.target;
-
-      const newSource = this.formEdge(source, targetNodeCallees);
-
-      source = newSource;
-    }
-
-    const lastNode = source;
-    return lastNode;
   }
 
   private getAncestor(
     ctx: ParserRuleContext
   ): VisualCobolParser.ParagraphContext | undefined {
     let currentCtx: ParserRuleContext | undefined = ctx;
-    while (currentCtx.parent) {
-      if (currentCtx instanceof VisualCobolParser.ParagraphContext) {
-        return currentCtx;
-      }
-
+    while (
+      !(currentCtx instanceof VisualCobolParser.ParagraphContext) &&
+      currentCtx
+    ) {
       currentCtx = currentCtx.parent as ParserRuleContext;
     }
 
-    return undefined;
+    return currentCtx;
   }
 }

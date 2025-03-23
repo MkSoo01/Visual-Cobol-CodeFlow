@@ -6,6 +6,7 @@ import {
   ConditionContext,
   FigurativeConstantContext,
   IdentifierContext,
+  IfElseContext,
   IfStatementContext,
   ParagraphContext,
   ParagraphExitContext,
@@ -508,14 +509,67 @@ suite("Tests for Control Flow Visitor", () => {
 
     visitor.visitIfStatement(mockedCtx);
 
-    const conditionNodes = visitor.nodes[0];
+    const conditionNode = visitor.nodes[0];
 
-    expect(conditionNodes).to.not.be.empty;
-    expect(conditionNodes.label).to.equal(expectedNodeName);
-    expect(conditionNodes.id).to.equal(expectedNodeId);
-    expect(conditionNodes.startLineNumber).to.equal(expectedStartLineNumber);
-    expect(conditionNodes.endLineNumber).to.equal(expectedEndLineNumber);
+    expect(conditionNode).to.not.be.undefined;
+    expect(conditionNode.label).to.equal(expectedNodeName);
+    expect(conditionNode.id).to.equal(expectedNodeId);
+    expect(conditionNode.startLineNumber).to.equal(expectedStartLineNumber);
+    expect(conditionNode.endLineNumber).to.equal(expectedEndLineNumber);
     expect(visitor.callerToCalleesMap.get(caller)).to.have.members([
+      expectedNodeId,
+    ]);
+    expect(visitor.calleeToCallersMap.get(expectedNodeId)).to.have.members([
+      caller,
+    ]);
+  });
+
+  test("the Else node data to be captured correctly", function () {
+    const expectedNodeName = "ELSE";
+    const expectedStartLineNumber = 245;
+    const expectedEndLineNumber = 253;
+    const expectedNodeId = expectedStartLineNumber.toString();
+
+    let mockedCtx = createMockedParserRuleCtx(
+      sinon.createStubInstance(IfStatementContext),
+      "",
+      230,
+      260
+    ) as IfStatementContext;
+
+    initIfStatementCtx(mockedCtx, expectedNodeName);
+    const mockedIfElseCtx = createMockedParserRuleCtx(
+      sinon.createStubInstance(IfElseContext),
+      "",
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    ) as IfElseContext;
+
+    const mockedElseTerminalNode: TerminalNode = {
+      text: "ELSE",
+    } as TerminalNode;
+
+    mockedIfElseCtx.ELSE = () => mockedElseTerminalNode;
+    mockedCtx.ifElse = () => mockedIfElseCtx;
+
+    const caller = "1000-INIT";
+    const mockedParagraphCtx: ParagraphContext = createMockedParagraphCtx(
+      caller,
+      0,
+      0
+    ) as ParagraphContext;
+    setParent(mockedCtx, mockedParagraphCtx);
+
+    visitor.visitIfStatement(mockedCtx);
+
+    const elseNode = visitor.nodes[1];
+
+    expect(elseNode).to.not.be.undefined;
+    expect(elseNode.label).to.equal(expectedNodeName);
+    expect(elseNode.id).to.equal(expectedNodeId);
+    expect(elseNode.startLineNumber).to.equal(expectedStartLineNumber);
+    expect(elseNode.endLineNumber).to.equal(expectedEndLineNumber);
+    expect(visitor.callerToCalleesMap.get(caller)).to.contain.members([
       expectedNodeId,
     ]);
     expect(visitor.calleeToCallersMap.get(expectedNodeId)).to.have.members([
@@ -611,11 +665,11 @@ suite("Tests for Control Flow Visitor", () => {
 
   function getEndNode(): Node {
     return {
-      id: "600",
+      id: "200",
       callers: [],
       callees: [],
-      startLineNumber: 600,
-      endLineNumber: 600,
+      startLineNumber: 200,
+      endLineNumber: 200,
       label: "0000-END",
       type: NodeType.END,
     };
@@ -634,11 +688,11 @@ suite("Tests for Control Flow Visitor", () => {
 
   function getStartNode(): Node {
     return {
-      id: "500",
+      id: "100",
       callers: [],
       callees: [],
-      startLineNumber: 500,
-      endLineNumber: 600,
+      startLineNumber: 100,
+      endLineNumber: 200,
       label: "0000-START",
       type: NodeType.START,
     };
@@ -744,6 +798,142 @@ suite("Tests for Control Flow Visitor", () => {
     expect(visitor.nodes).to.have.members([startNode, endNode]);
   });
 
+  test("when the last node visited, the callees of the node with no caller will be removed if only has one caller", function () {
+    const startNode: Node = getStartNode();
+    const endNode: Node = getEndNode();
+    const normalNodeLabelWithNoCaller = "1000-INIT";
+
+    const normalNodeWithNoCaller: Node = {
+      id: "700",
+      callers: [],
+      callees: [],
+      startLineNumber: 700,
+      endLineNumber: 800,
+      label: normalNodeLabelWithNoCaller,
+      type: NodeType.NORMAL,
+    };
+
+    const calleeNodeWithOneCaller: Node = {
+      id: "900",
+      callers: [],
+      callees: [],
+      startLineNumber: 900,
+      endLineNumber: 1000,
+      label: "1100-TEST-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    const calleeNodeWithMultipleCaller: Node = {
+      id: "1000",
+      callers: [],
+      callees: [],
+      startLineNumber: 1000,
+      endLineNumber: 1100,
+      label: "1200-TEST-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
+    visitor.calleeToCallersMap.set(calleeNodeWithOneCaller.label, [
+      normalNodeWithNoCaller.label,
+    ]);
+    visitor.calleeToCallersMap.set(calleeNodeWithMultipleCaller.label, [
+      startNode.label,
+      normalNodeWithNoCaller.label,
+    ]);
+    visitor.callerToCalleesMap.set(startNode.label, [
+      calleeNodeWithMultipleCaller.label,
+      endNode.label,
+    ]);
+    visitor.callerToCalleesMap.set(normalNodeWithNoCaller.label, [
+      calleeNodeWithOneCaller.label,
+      calleeNodeWithMultipleCaller.label,
+    ]);
+    visitor.nodes = [
+      startNode,
+      endNode,
+      normalNodeWithNoCaller,
+      calleeNodeWithOneCaller,
+      calleeNodeWithMultipleCaller,
+    ];
+
+    const lastNode = createLastNodeCtx();
+
+    visitor.visitChildren(lastNode);
+
+    expect(visitor.nodes.length).to.equal(3);
+    expect(visitor.nodes).to.have.members([
+      startNode,
+      calleeNodeWithMultipleCaller,
+      endNode,
+    ]);
+  });
+
+  test("when the last node visited, the callees of the node with no caller will be removed RECURSIVELY if only has one caller", function () {
+    const startNode: Node = getStartNode();
+    const endNode: Node = getEndNode();
+    const normalNodeLabelWithNoCaller = "1000-INIT";
+
+    const normalNodeWithNoCaller: Node = {
+      id: "700",
+      callers: [],
+      callees: [],
+      startLineNumber: 700,
+      endLineNumber: 800,
+      label: normalNodeLabelWithNoCaller,
+      type: NodeType.NORMAL,
+    };
+
+    const calleeNodeWithOneCaller: Node = {
+      id: "800",
+      callers: [],
+      callees: [],
+      startLineNumber: 800,
+      endLineNumber: 900,
+      label: "1100-TEST-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    const calleeNodeWithOneCaller2: Node = {
+      id: "900",
+      callers: [],
+      callees: [],
+      startLineNumber: 900,
+      endLineNumber: 1000,
+      label: "1200-TEST-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
+    visitor.calleeToCallersMap.set(calleeNodeWithOneCaller.label, [
+      normalNodeWithNoCaller.label,
+    ]);
+    visitor.calleeToCallersMap.set(calleeNodeWithOneCaller2.label, [
+      calleeNodeWithOneCaller.label,
+    ]);
+    visitor.callerToCalleesMap.set(startNode.label, [endNode.label]);
+    visitor.callerToCalleesMap.set(normalNodeWithNoCaller.label, [
+      calleeNodeWithOneCaller.label,
+    ]);
+    visitor.callerToCalleesMap.set(calleeNodeWithOneCaller.label, [
+      calleeNodeWithOneCaller2.label,
+    ]);
+    visitor.nodes = [
+      startNode,
+      endNode,
+      normalNodeWithNoCaller,
+      calleeNodeWithOneCaller,
+      calleeNodeWithOneCaller2,
+    ];
+
+    const lastNode = createLastNodeCtx();
+
+    visitor.visitChildren(lastNode);
+
+    expect(visitor.nodes.length).to.equal(2);
+    expect(visitor.nodes).to.have.members([startNode, endNode]);
+  });
+
   test("callers and callees of the node will not be populated unless the last node visisted", function () {
     const startNode: Node = getStartNode();
     const endNode: Node = getEndNode();
@@ -776,7 +966,6 @@ suite("Tests for Control Flow Visitor", () => {
   test("when the last node visisted, callers and callees of the normal node are populated correctly", function () {
     const startNode: Node = getStartNode();
     const endNode: Node = getEndNode();
-    const normalNodeLabel = "1000-INIT";
 
     const normalNode: Node = {
       id: "700",
@@ -784,18 +973,16 @@ suite("Tests for Control Flow Visitor", () => {
       callees: [],
       startLineNumber: 700,
       endLineNumber: 750,
-      label: normalNodeLabel,
+      label: "1000-INIT",
       type: NodeType.NORMAL,
     };
-
-    const normalNodeCalleeLabel = "2000-PROCESS";
     const normalNodeCallee: Node = {
       id: "800",
       callers: [],
       callees: [],
       startLineNumber: 800,
       endLineNumber: 850,
-      label: normalNodeCalleeLabel,
+      label: "2000-PROCESS",
       type: NodeType.NORMAL,
     };
 
@@ -813,18 +1000,17 @@ suite("Tests for Control Flow Visitor", () => {
     const lastNode = createLastNodeCtx();
     visitor.visitChildren(lastNode);
 
-    expect(normalNode.callees).to.have.members([normalNodeCalleeLabel]);
-    expect(normalNode.callers).to.have.members([startNode.label]);
-    expect(normalNodeCallee.callers).to.have.members([normalNode.label]);
-    expect(startNode.callees).to.have.members([normalNodeLabel, endNode.label]);
-    expect(endNode.callers).to.have.members([startNode.label]);
+    expect(normalNode.callees).to.have.members([normalNodeCallee.id]);
+    expect(normalNode.callers).to.have.members([startNode.id]);
+    expect(normalNodeCallee.callers).to.have.members([normalNode.id]);
+    expect(startNode.callees).to.have.members([normalNode.id, endNode.id]);
+    expect(endNode.callers).to.have.members([startNode.id]);
   });
 
   test("when the last node visisted, callers of the condition node are populated correctly", function () {
     const startNode: Node = getStartNode();
     const endNode: Node = getEndNode();
     const conditionNodeId = "700";
-    const conditionNodeLabel = "IF OFFICIAL-RATE EQUALS ZEROES";
 
     const conditionNode: Node = {
       id: conditionNodeId,
@@ -832,7 +1018,7 @@ suite("Tests for Control Flow Visitor", () => {
       callees: [],
       startLineNumber: 700,
       endLineNumber: 750,
-      label: conditionNodeLabel,
+      label: "IF OFFICIAL-RATE EQUALS ZEROES",
       type: NodeType.CONDITION,
     };
 
@@ -847,19 +1033,47 @@ suite("Tests for Control Flow Visitor", () => {
     const lastNode = createLastNodeCtx();
     visitor.visitChildren(lastNode);
 
-    expect(conditionNode.callers).to.have.members([startNode.label]);
-    expect(startNode.callees).to.have.members([
-      conditionNode.id,
+    expect(conditionNode.callers).to.have.members([startNode.id]);
+    expect(startNode.callees).to.have.members([conditionNode.id, endNode.id]);
+    expect(endNode.callers).to.have.members([startNode.id]);
+  });
+
+  test("when the last node visisted, callers of the else node are populated correctly", function () {
+    const startNode: Node = getStartNode();
+    const endNode: Node = getEndNode();
+    const elseNodeId = "700";
+    const elseNodeLabel = "ELSE";
+
+    const elseNode: Node = {
+      id: elseNodeId,
+      callers: [],
+      callees: [],
+      startLineNumber: 700,
+      endLineNumber: 750,
+      label: elseNodeLabel,
+      type: NodeType.CONDITION_ELSE,
+    };
+
+    visitor.calleeToCallersMap.set(elseNode.id, [startNode.label]);
+    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
+    visitor.callerToCalleesMap.set(startNode.label, [
+      elseNode.id,
       endNode.label,
     ]);
-    expect(endNode.callers).to.have.members([startNode.label]);
+    visitor.nodes = [startNode, endNode, elseNode];
+
+    const lastNode = createLastNodeCtx();
+    visitor.visitChildren(lastNode);
+
+    expect(elseNode.callers).to.have.members([startNode.id]);
+    expect(startNode.callees).to.have.members([elseNode.id, endNode.id]);
+    expect(endNode.callers).to.have.members([startNode.id]);
   });
 
   test("when the last node visisted, callers of the loop node are populated correctly", function () {
     const startNode: Node = getStartNode();
     const endNode: Node = getEndNode();
     const loopNodeId = "700";
-    const loopNodeLabel = "PERFORM UNTIL SQLCODE = CC-NOT-FOUND";
 
     const loopNode: Node = {
       id: loopNodeId,
@@ -867,7 +1081,7 @@ suite("Tests for Control Flow Visitor", () => {
       callees: [],
       startLineNumber: 700,
       endLineNumber: 750,
-      label: loopNodeLabel,
+      label: "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
       type: NodeType.LOOP,
     };
 
@@ -882,8 +1096,8 @@ suite("Tests for Control Flow Visitor", () => {
     const lastNode = createLastNodeCtx();
     visitor.visitChildren(lastNode);
 
-    expect(loopNode.callers).to.have.members([startNode.label]);
-    expect(startNode.callees).to.have.members([loopNode.id, endNode.label]);
-    expect(endNode.callers).to.have.members([startNode.label]);
+    expect(loopNode.callers).to.have.members([startNode.id]);
+    expect(startNode.callees).to.have.members([loopNode.id, endNode.id]);
+    expect(endNode.callers).to.have.members([startNode.id]);
   });
 });

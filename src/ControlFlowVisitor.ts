@@ -9,6 +9,7 @@ export enum NodeType {
   START = "start",
   END = "end",
   CONDITION = "condition",
+  CONDITION_ELSE = "conditionELSE",
   LOOP = "loop",
   NORMAL = "normal",
 }
@@ -144,12 +145,27 @@ export class ControlFlowVisitor
       callees: [],
     };
 
+    this.nodes.push(conditionNode);
+
     const ancestor = this.getAncestor(ctx);
     if (ancestor) {
       this.addToMap(ancestor.paragraphName().text, conditionNode.id);
+      const ifElse = ctx.ifElse();
+      if (ifElse) {
+        const elseNode = {
+          id: ifElse.start.line.toString(),
+          label: ifElse.ELSE().text,
+          type: NodeType.CONDITION_ELSE,
+          startLineNumber: ifElse.start.line,
+          endLineNumber: ifElse.stop ? ifElse.stop.line : ifElse.start.line,
+          callers: [],
+          callees: [],
+        };
+        this.nodes.push(elseNode);
+        this.addToMap(ancestor.paragraphName().text, elseNode.id);
+      }
     }
 
-    this.nodes.push(conditionNode);
     this.visitChildren(ctx);
   }
 
@@ -194,6 +210,34 @@ export class ControlFlowVisitor
     }
   }
 
+  private getIdFor(identifiers: string[]): string[] {
+    let ids: string[] = [];
+    identifiers.forEach((identifier) => {
+      const node = this.nodes.find(
+        (n) => n.label === identifier || n.id === identifier
+      );
+      if (node) {
+        ids.push(node.id);
+      }
+    });
+    return ids;
+  }
+
+  private findCalleesOfUnusedNode(unusedNode: Node): string[] {
+    let calleesOfUnusedNode: string[] = [];
+    if (unusedNode && unusedNode.callees.length > 0) {
+      unusedNode.callees.forEach((callee) => {
+        const calleeNode = this.nodes.find((n) => n.id === callee);
+        if (calleeNode && calleeNode.callers.length === 1) {
+          calleesOfUnusedNode.push(calleeNode.id);
+          calleesOfUnusedNode.push(...this.findCalleesOfUnusedNode(calleeNode));
+        }
+      });
+    }
+
+    return calleesOfUnusedNode;
+  }
+
   visitChildren(node: ParserRuleContext) {
     super.visitChildren(node);
 
@@ -201,17 +245,28 @@ export class ControlFlowVisitor
       let unusedNodes: string[] = [];
       this.nodes.forEach((child) => {
         let key = child.label;
-        if (child.type === NodeType.CONDITION || child.type === NodeType.LOOP) {
+        if (
+          child.type === NodeType.CONDITION ||
+          child.type === NodeType.CONDITION_ELSE ||
+          child.type === NodeType.LOOP
+        ) {
           key = child.id;
         }
         const callees = this.callerToCalleesMap.get(key);
         const callers = this.calleeToCallersMap.get(key);
 
-        child.callees = callees ? callees : [];
-        child.callers = callers ? callers : [];
+        child.callees = callees ? this.getIdFor(callees) : [];
+        child.callers = callers ? this.getIdFor(callers) : [];
 
         if (child.type !== NodeType.START && child.callers.length === 0) {
           unusedNodes.push(child.id);
+        }
+      });
+
+      [...unusedNodes].forEach((unusedNodeId) => {
+        const unusedNode = this.nodes.find((n) => n.id === unusedNodeId);
+        if (unusedNode) {
+          unusedNodes.push(...this.findCalleesOfUnusedNode(unusedNode));
         }
       });
 

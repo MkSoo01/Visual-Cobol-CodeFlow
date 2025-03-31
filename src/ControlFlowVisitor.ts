@@ -19,19 +19,49 @@ export class ControlFlowVisitor
   }
 
   public getNodes(): Node[] {
-    return this.nodes;
+    return [...this.nodes];
   }
 
-  public setNodes(nodes: Node[]): void {
-    this.nodes = nodes;
+  public addNode(node: Node) {
+    if (node) {
+      this.nodes.push(node);
+    }
+  }
+
+  public addNodes(nodes: Node[]) {
+    if (nodes.length > 0) {
+      this.nodes = this.nodes.concat(nodes);
+    }
+  }
+
+  public removeNodes(toBeRemovedIds: string[]) {
+    if (toBeRemovedIds.length > 0) {
+      this.nodes = this.nodes.filter((n) => !toBeRemovedIds.includes(n.id));
+    }
   }
 
   public getCallerToCalleesMap(): Map<string, string[]> {
-    return this.callerToCalleesMap;
+    return structuredClone(this.callerToCalleesMap);
+  }
+
+  public addEntryToCallerCalleesMap(caller: string, callee: string) {
+    if (caller && callee) {
+      if (this.callerToCalleesMap.has(caller)) {
+        this.callerToCalleesMap.get(caller)?.push(callee);
+      } else {
+        this.callerToCalleesMap.set(caller, [callee]);
+      }
+
+      if (this.calleeToCallersMap.has(callee)) {
+        this.calleeToCallersMap.get(callee)?.push(caller);
+      } else {
+        this.calleeToCallersMap.set(callee, [caller]);
+      }
+    }
   }
 
   public getCalleeToCallersMap(): Map<string, string[]> {
-    return this.calleeToCallersMap;
+    return structuredClone(this.calleeToCallersMap);
   }
 
   private formNode(
@@ -61,7 +91,7 @@ export class ControlFlowVisitor
       ctx.stop ? ctx.stop.line : ctx.start.line
     );
 
-    this.getNodes().push(node);
+    this.addNode(node);
 
     if (ctx.paragraphName().text?.startsWith("0000")) {
       node.type = NodeType.START;
@@ -79,26 +109,10 @@ export class ControlFlowVisitor
     if (ancestor) {
       caller = ancestor;
       callee = ctx.procedureName(0).text;
-      this.addToMap(caller, callee);
+      this.addEntryToCallerCalleesMap(caller, callee);
     }
 
     this.visitChildren(ctx);
-  }
-
-  addToMap(caller: string | undefined, callee: string | undefined) {
-    if (caller && callee) {
-      if (this.getCalleeToCallersMap().has(callee)) {
-        this.getCalleeToCallersMap().get(callee)?.push(caller);
-      } else {
-        this.getCalleeToCallersMap().set(callee, [caller]);
-      }
-
-      if (this.getCallerToCalleesMap().has(caller)) {
-        this.getCallerToCalleesMap().get(caller)?.push(callee);
-      } else {
-        this.getCallerToCalleesMap().set(caller, [callee]);
-      }
-    }
   }
 
   visitIfStatement(ctx: VisualCobolParser.IfStatementContext): void {
@@ -113,11 +127,11 @@ export class ControlFlowVisitor
       ctx.stop ? ctx.stop.line : ctx.start.line
     );
 
-    this.getNodes().push(conditionNode);
+    this.addNode(conditionNode);
 
     const ancestor = this.getAncestor(ctx);
     if (ancestor) {
-      this.addToMap(ancestor, conditionNode.id);
+      this.addEntryToCallerCalleesMap(ancestor, conditionNode.id);
     }
 
     this.visitChildren(ctx);
@@ -132,11 +146,11 @@ export class ControlFlowVisitor
       ctx.stop ? ctx.stop.line : ctx.start.line
     );
 
-    this.getNodes().push(elseNode);
+    this.addNode(elseNode);
 
     const ancestor = this.getAncestor(ctx);
     if (ancestor) {
-      this.addToMap(ancestor, elseNode.id);
+      this.addEntryToCallerCalleesMap(ancestor, elseNode.id);
     }
 
     this.visitChildren(ctx);
@@ -160,10 +174,10 @@ export class ControlFlowVisitor
 
       const ancestor = this.getAncestor(ctx);
       if (ancestor) {
-        this.addToMap(ancestor, performUntilNode.id);
+        this.addEntryToCallerCalleesMap(ancestor, performUntilNode.id);
       }
 
-      this.getNodes().push(performUntilNode);
+      this.addNode(performUntilNode);
       this.visitChildren(ctx);
     }
   }
@@ -273,9 +287,7 @@ export class ControlFlowVisitor
         }
       });
 
-      this.setNodes(
-        this.getNodes().filter((child) => !unusedNodes.includes(child.id))
-      );
+      this.removeNodes(unusedNodes);
     }
   }
 

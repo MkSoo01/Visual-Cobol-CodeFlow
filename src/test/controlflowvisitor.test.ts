@@ -9,7 +9,6 @@ import {
   IfElseContext,
   IfStatementContext,
   ParagraphContext,
-  ParagraphExitContext,
   ParagraphNameContext,
   PerformInlineStatementContext,
   PerformProcedureStatementContext,
@@ -25,7 +24,6 @@ import {
 import { ControlFlowVisitor, Node, NodeType } from "../ControlFlowVisitor";
 import { ParserRuleContext, Token } from "antlr4ts";
 import sinon from "sinon";
-import { ControlFlowGraph } from "../ControlFlowGraph";
 import { TerminalNode } from "antlr4ts/tree/TerminalNode";
 
 chai.use(sinonChai);
@@ -38,172 +36,187 @@ suite("Tests for Control Flow Visitor", () => {
     visitor = new ControlFlowVisitor();
   });
 
+  function formNode(
+    id: string,
+    label: string,
+    type: NodeType,
+    startLineNumber: number,
+    endLineNumber: number
+  ): Node {
+    return {
+      id: id,
+      label: label,
+      type: type,
+      startLineNumber: startLineNumber,
+      endLineNumber: endLineNumber,
+      callers: [],
+      callees: [],
+    };
+  }
+
   function defineProperty(object: any, property: string, value: any) {
     Object.defineProperty(object, property, {
       get: () => value,
     });
   }
 
-  function createMockedParserRuleCtx(
+  function createStubParserRuleCtx(
     ctx: ParserRuleContext,
     text: string,
     startLineNumber: number,
     endLineNumber: number
   ): ParserRuleContext {
-    const mockedCtx = ctx;
+    const stubCtx = ctx;
 
-    const mockedStartToken: Token = {
+    const stubStartToken: Token = {
       line: startLineNumber,
     } as Token;
 
-    const mockedStopToken: Token = {
+    const stubStopToken: Token = {
       line: endLineNumber,
     } as Token;
 
-    defineProperty(mockedCtx, "start", mockedStartToken);
-    defineProperty(mockedCtx, "stop", mockedStopToken);
-    defineProperty(mockedCtx, "text", text);
+    defineProperty(stubCtx, "start", stubStartToken);
+    defineProperty(stubCtx, "stop", stubStopToken);
+    defineProperty(stubCtx, "text", text);
 
-    return mockedCtx;
+    return stubCtx;
   }
 
-  function createMockedParagraphCtx(
+  function createStubParagraphCtx(
     paragraphName: string,
     startLineNumber: number,
     endLineNumber: number
   ): ParagraphContext {
-    const mockedCtx = createMockedParserRuleCtx(
+    const stubCtx = createStubParserRuleCtx(
       sinon.createStubInstance(ParagraphContext),
       "",
       startLineNumber,
       endLineNumber
     ) as ParagraphContext;
 
-    const mockedParagraphName = createMockedParserRuleCtx(
+    const stubParagraphName = createStubParserRuleCtx(
       sinon.createStubInstance(ParagraphNameContext),
       paragraphName,
       startLineNumber,
       startLineNumber
     ) as ParagraphNameContext;
 
-    mockedCtx.paragraphName = () => mockedParagraphName;
+    stubCtx.paragraphName = () => stubParagraphName;
 
-    return mockedCtx;
+    return stubCtx;
   }
 
   function setParent(child: ParserRuleContext, parent: ParserRuleContext) {
     defineProperty(child, "parent", parent);
   }
 
-  function createMockedPerformProcedureStatementCtx(
+  function createStubPerformProcedureStatementCtx(
     procedureName: string,
     caller: ParserRuleContext
   ): PerformProcedureStatementContext {
-    const mockedCtx = sinon.createStubInstance(
-      PerformProcedureStatementContext
-    );
-    const mockedProcedureNameCtx = createMockedParserRuleCtx(
+    const stubCtx = sinon.createStubInstance(PerformProcedureStatementContext);
+    const stubProcedureNameCtx = createStubParserRuleCtx(
       sinon.createStubInstance(ProcedureNameContext),
       procedureName,
       0,
       0
     ) as ProcedureNameContext;
 
-    mockedCtx.procedureName.returns(mockedProcedureNameCtx);
-    const mockedSentenceCtx = sinon.createStubInstance(SentenceContext);
-    const mockedStatementCtx = sinon.createStubInstance(StatementContext);
-    const mockedPerformStatementCtx = sinon.createStubInstance(
+    stubCtx.procedureName.returns(stubProcedureNameCtx);
+    const stubSentenceCtx = sinon.createStubInstance(SentenceContext);
+    const stubStatementCtx = sinon.createStubInstance(StatementContext);
+    const stubPerformStatementCtx = sinon.createStubInstance(
       PerformStatementContext
     );
 
-    setParent(mockedCtx, mockedPerformStatementCtx);
-    setParent(mockedPerformStatementCtx, mockedStatementCtx);
-    setParent(mockedStatementCtx, mockedSentenceCtx);
-    setParent(mockedSentenceCtx, caller);
+    setParent(stubCtx, stubPerformStatementCtx);
+    setParent(stubPerformStatementCtx, stubStatementCtx);
+    setParent(stubStatementCtx, stubSentenceCtx);
+    setParent(stubSentenceCtx, caller);
 
-    return mockedCtx;
+    return stubCtx;
   }
 
   function initIfStatementCtx(
-    mockedIfStatementCtx: IfStatementContext,
+    stubIfStatementCtx: IfStatementContext,
     ifStatementText: string
   ) {
     const textArray = ifStatementText.split(" ");
     textArray.shift();
 
-    const mockedCobolWordTerminalNode = sinon.createStubInstance(TerminalNode);
-    defineProperty(mockedCobolWordTerminalNode, "text", textArray[0]);
+    const stubCobolWordTerminalNode = sinon.createStubInstance(TerminalNode);
+    defineProperty(stubCobolWordTerminalNode, "text", textArray[0]);
 
-    const mockedTerminalNode = sinon.createStubInstance(TerminalNode);
-    defineProperty(mockedTerminalNode, "text", textArray[1]);
+    const stubTerminalNode = sinon.createStubInstance(TerminalNode);
+    defineProperty(stubTerminalNode, "text", textArray[1]);
 
-    const mockedFigurativeConstantTerminalNode =
+    const stubFigurativeConstantTerminalNode =
       sinon.createStubInstance(TerminalNode);
     defineProperty(
-      mockedFigurativeConstantTerminalNode,
+      stubFigurativeConstantTerminalNode,
       "text",
       textArray.slice(2).join(" ")
     );
 
-    const mockedConditionCtx = sinon.createStubInstance(ConditionContext);
-    const mockedCombinableConditionCtx = sinon.createStubInstance(
+    const stubConditionCtx = sinon.createStubInstance(ConditionContext);
+    const stubCombinableConditionCtx = sinon.createStubInstance(
       CombinableConditionContext
     );
-    const mockedSimpleConditionCtx = sinon.createStubInstance(
+    const stubSimpleConditionCtx = sinon.createStubInstance(
       SimpleConditionContext
     );
-    const mockedClassConditionCtx = sinon.createStubInstance(
+    const stubClassConditionCtx = sinon.createStubInstance(
       ClassConditionContext
     );
-    const mockedIdentifierCtx = sinon.createStubInstance(IdentifierContext);
-    const mockedFigurativeConstantCtx = sinon.createStubInstance(
+    const stubIdentifierCtx = sinon.createStubInstance(IdentifierContext);
+    const stubFigurativeConstantCtx = sinon.createStubInstance(
       FigurativeConstantContext
     );
 
-    defineProperty(mockedConditionCtx, "childCount", 1);
-    defineProperty(mockedCombinableConditionCtx, "childCount", 1);
-    defineProperty(mockedSimpleConditionCtx, "childCount", 1);
-    defineProperty(mockedClassConditionCtx, "childCount", 3);
-    defineProperty(mockedIdentifierCtx, "childCount", 1);
-    defineProperty(mockedFigurativeConstantCtx, "childCount", 1);
+    defineProperty(stubConditionCtx, "childCount", 1);
+    defineProperty(stubCombinableConditionCtx, "childCount", 1);
+    defineProperty(stubSimpleConditionCtx, "childCount", 1);
+    defineProperty(stubClassConditionCtx, "childCount", 3);
+    defineProperty(stubIdentifierCtx, "childCount", 1);
+    defineProperty(stubFigurativeConstantCtx, "childCount", 1);
 
-    mockedConditionCtx.getChild
+    stubConditionCtx.getChild.withArgs(0).returns(stubCombinableConditionCtx);
+    stubCombinableConditionCtx.getChild
       .withArgs(0)
-      .returns(mockedCombinableConditionCtx);
-    mockedCombinableConditionCtx.getChild
-      .withArgs(0)
-      .returns(mockedSimpleConditionCtx);
-    mockedSimpleConditionCtx.getChild
-      .withArgs(0)
-      .returns(mockedClassConditionCtx);
-    mockedClassConditionCtx.getChild.withArgs(0).returns(mockedIdentifierCtx);
-    mockedClassConditionCtx.getChild.withArgs(1).returns(mockedTerminalNode);
-    mockedClassConditionCtx.getChild
+      .returns(stubSimpleConditionCtx);
+    stubSimpleConditionCtx.getChild.withArgs(0).returns(stubClassConditionCtx);
+    stubClassConditionCtx.getChild.withArgs(0).returns(stubIdentifierCtx);
+    stubClassConditionCtx.getChild.withArgs(1).returns(stubTerminalNode);
+    stubClassConditionCtx.getChild
       .withArgs(2)
-      .returns(mockedFigurativeConstantCtx);
-    mockedIdentifierCtx.getChild
+      .returns(stubFigurativeConstantCtx);
+    stubIdentifierCtx.getChild.withArgs(0).returns(stubCobolWordTerminalNode);
+    stubFigurativeConstantCtx.getChild
       .withArgs(0)
-      .returns(mockedCobolWordTerminalNode);
-    mockedFigurativeConstantCtx.getChild
-      .withArgs(0)
-      .returns(mockedFigurativeConstantTerminalNode);
+      .returns(stubFigurativeConstantTerminalNode);
 
-    const mockedIfStatementTerminalNode: TerminalNode = {
+    const stubIfTerminalNode: TerminalNode = {
       text: "IF",
     } as TerminalNode;
 
-    mockedIfStatementCtx.IF = () => mockedIfStatementTerminalNode;
-    mockedIfStatementCtx.condition = () => mockedConditionCtx;
+    const stubEndIfTerminalNode: TerminalNode = {
+      text: "END-IF",
+    } as TerminalNode;
+
+    stubIfStatementCtx.IF = () => stubIfTerminalNode;
+    stubIfStatementCtx.END_IF = () => stubEndIfTerminalNode;
+    stubIfStatementCtx.condition = () => stubConditionCtx;
   }
 
   function initPerformInlineStatementCtx(
-    mockedPerformInlineStatementCtx: PerformInlineStatementContext,
+    stubPerformInlineStatementCtx: PerformInlineStatementContext,
     performInlineStatementText: string
   ) {
-    const mockedPerformTypeCtx = sinon.createStubInstance(PerformTypeContext);
-    const mockedPerformUntilCtx = sinon.createStubInstance(PerformUntilContext);
-    mockedPerformInlineStatementCtx.performType = () => mockedPerformTypeCtx;
-    mockedPerformTypeCtx.performUntil.returns(mockedPerformUntilCtx);
+    const stubPerformTypeCtx = sinon.createStubInstance(PerformTypeContext);
+    const stubPerformUntilCtx = sinon.createStubInstance(PerformUntilContext);
+    stubPerformInlineStatementCtx.performType = () => stubPerformTypeCtx;
+    stubPerformTypeCtx.performUntil.returns(stubPerformUntilCtx);
 
     const textArray = performInlineStatementText.split(" ");
     textArray.shift();
@@ -211,123 +224,80 @@ suite("Tests for Control Flow Visitor", () => {
     defineProperty(untilTerminalNode, "text", textArray[0]);
     const otherTerminalNode = sinon.createStubInstance(TerminalNode);
     defineProperty(otherTerminalNode, "text", textArray.splice(1).join(" "));
-    const mockedConditionCtx = sinon.createStubInstance(ConditionContext);
-    const mockedCombinableConditionCtx = sinon.createStubInstance(
+    const stubConditionCtx = sinon.createStubInstance(ConditionContext);
+    const stubCombinableConditionCtx = sinon.createStubInstance(
       CombinableConditionContext
     );
-    const mockedSimpleConditionCtx = sinon.createStubInstance(
+    const stubSimpleConditionCtx = sinon.createStubInstance(
       SimpleConditionContext
     );
-    const mockedRelationConditionCtx = sinon.createStubInstance(
+    const stubRelationConditionCtx = sinon.createStubInstance(
       RelationConditionContext
     );
-    mockedPerformUntilCtx.getChild.withArgs(0).returns(untilTerminalNode);
-    mockedPerformUntilCtx.getChild.withArgs(1).returns(mockedConditionCtx);
-    defineProperty(mockedPerformUntilCtx, "childCount", 2);
-    mockedConditionCtx.getChild
+    stubPerformUntilCtx.getChild.withArgs(0).returns(untilTerminalNode);
+    stubPerformUntilCtx.getChild.withArgs(1).returns(stubConditionCtx);
+    defineProperty(stubPerformUntilCtx, "childCount", 2);
+    stubConditionCtx.getChild.withArgs(0).returns(stubCombinableConditionCtx);
+    defineProperty(stubConditionCtx, "childCount", 1);
+    stubCombinableConditionCtx.getChild
       .withArgs(0)
-      .returns(mockedCombinableConditionCtx);
-    defineProperty(mockedConditionCtx, "childCount", 1);
-    mockedCombinableConditionCtx.getChild
+      .returns(stubSimpleConditionCtx);
+    defineProperty(stubCombinableConditionCtx, "childCount", 1);
+    stubSimpleConditionCtx.getChild
       .withArgs(0)
-      .returns(mockedSimpleConditionCtx);
-    defineProperty(mockedCombinableConditionCtx, "childCount", 1);
-    mockedSimpleConditionCtx.getChild
-      .withArgs(0)
-      .returns(mockedRelationConditionCtx);
-    defineProperty(mockedSimpleConditionCtx, "childCount", 1);
-    mockedRelationConditionCtx.getChild.withArgs(0).returns(otherTerminalNode);
-    defineProperty(mockedRelationConditionCtx, "childCount", 1);
+      .returns(stubRelationConditionCtx);
+    defineProperty(stubSimpleConditionCtx, "childCount", 1);
+    stubRelationConditionCtx.getChild.withArgs(0).returns(otherTerminalNode);
+    defineProperty(stubRelationConditionCtx, "childCount", 1);
   }
 
   test("the start node data to be captured correctly", function () {
     const expectedNodeName = "0000-MAIN-ROUTINE";
     const expectedStartLineNumber = 235;
     const expectedEndLineNumber = 256;
-    const mockedCtx = createMockedParagraphCtx(
+    const stubCtx = createStubParagraphCtx(
       expectedNodeName,
       expectedStartLineNumber,
       expectedEndLineNumber
     );
 
-    visitor.visitParagraph(mockedCtx);
+    visitor.visitParagraph(stubCtx);
 
     expect(visitor.nodes.length).to.equal(1);
 
-    const startNode = visitor.nodes[0];
-
-    expect(startNode?.id).to.equal(startNode?.startLineNumber.toString());
-    expect(startNode?.label).to.equal(expectedNodeName);
-    expect(startNode?.startLineNumber).to.equal(expectedStartLineNumber);
-    expect(startNode?.endLineNumber).to.equal(expectedEndLineNumber);
-    expect(startNode?.type).to.equal(NodeType.START);
-    expect(startNode?.callers).to.be.empty;
-  });
-
-  test("the end node data to be captured correctly", function () {
-    const startNodeName = "0000-MAIN-ROUTINE";
-    const startNodeStartLineNumber = 235;
-    const startNodeEndLineNumber = 256;
-    const mockedCtx = createMockedParagraphCtx(
-      startNodeName,
-      startNodeStartLineNumber,
-      startNodeEndLineNumber
-    );
-
-    const expectedNodeName = "0000-EXIT";
-    const expectedEndLineNumber = startNodeEndLineNumber;
-
-    const mockedParagraphExit = createMockedParagraphCtx(
+    const actual = visitor.nodes[0];
+    const expected = formNode(
+      expectedStartLineNumber.toString(),
       expectedNodeName,
-      expectedEndLineNumber,
+      NodeType.START,
+      expectedStartLineNumber,
       expectedEndLineNumber
-    ) as unknown as ParagraphExitContext;
-
-    mockedCtx.paragraphExit = () => mockedParagraphExit;
-
-    visitor.visitParagraph(mockedCtx);
-
-    expect(visitor.nodes).to.not.be.empty;
-
-    const endNode = visitor.nodes[1];
-
-    expect(endNode.id).to.equal(endNode?.startLineNumber.toString());
-    expect(endNode.label).to.equal(expectedNodeName);
-    expect(endNode.startLineNumber).to.equal(expectedEndLineNumber);
-    expect(endNode.endLineNumber).to.equal(endNode?.startLineNumber);
-    expect(endNode.type).to.equal(NodeType.END);
-    expect(visitor.calleeToCallersMap.has(endNode.label)).to.be.true;
-    expect(visitor.calleeToCallersMap.get(endNode.label)).to.have.members([
-      startNodeName,
-    ]);
-    expect(visitor.callerToCalleesMap.has(startNodeName)).to.be.true;
-    expect(visitor.callerToCalleesMap.get(startNodeName)).to.have.members([
-      endNode.label,
-    ]);
+    );
+    expect(actual).to.deep.equal(expected);
   });
 
   test("the normal node data to be captured correctly", function () {
     const expectedNodeName = "1000-INIT";
     const expectedStartLineNumber = 265;
     const expectedEndLineNumber = 275;
-    const mockedCtx = createMockedParagraphCtx(
+    const stubCtx = createStubParagraphCtx(
       expectedNodeName,
       expectedStartLineNumber,
       expectedEndLineNumber
     );
 
-    visitor.visitParagraph(mockedCtx);
+    visitor.visitParagraph(stubCtx);
 
-    expect(visitor.nodes.length).to.equal(1);
+    const actual = visitor.nodes[0];
+    const expected = formNode(
+      expectedStartLineNumber.toString(),
+      expectedNodeName,
+      NodeType.NORMAL,
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    );
 
-    const normalNode = visitor.nodes[0];
-
-    expect(normalNode?.id).to.equal(normalNode?.startLineNumber.toString());
-    expect(normalNode?.label).to.equal(expectedNodeName);
-    expect(normalNode?.startLineNumber).to.equal(expectedStartLineNumber);
-    expect(normalNode?.endLineNumber).to.equal(expectedEndLineNumber);
-    expect(normalNode?.type).to.equal(NodeType.NORMAL);
-    expect(normalNode?.callers).to.be.empty;
+    expect(actual).to.deep.equal(expected);
   });
 
   test("visitParagraph call visitChildren once at the end", function () {
@@ -336,130 +306,181 @@ suite("Tests for Control Flow Visitor", () => {
     const expectedNodeName = "1000-INIT";
     const expectedStartLineNumber = 265;
     const expectedEndLineNumber = 275;
-    const mockedCtx = createMockedParagraphCtx(
+    const stubCtx = createStubParagraphCtx(
       expectedNodeName,
       expectedStartLineNumber,
       expectedEndLineNumber
     );
 
-    visitor.visitParagraph(mockedCtx);
+    visitor.visitParagraph(stubCtx);
 
     expect(visitChildrenStub).to.have.been.calledOnce;
   });
 
-  test("caller and callee to be identified correctly", function () {
+  test("caller and callee to be captured correctly in visitPerformProcedureStatement", function () {
     const callerNodeName = "0000-MAIN-ROUTINE";
     const callerStartLineNumber = 235;
     const callerEndLineNumber = 256;
-    const mockedParagraphCtx: ParagraphContext = createMockedParagraphCtx(
+    const callerId = callerStartLineNumber.toString();
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
       callerNodeName,
       callerStartLineNumber,
       callerEndLineNumber
     ) as unknown as ParagraphContext;
 
     const procedureName = "1000-INIT";
-    const mockedCtx = createMockedPerformProcedureStatementCtx(
+    const stubCtx = createStubPerformProcedureStatementCtx(
       procedureName,
-      mockedParagraphCtx
+      stubParagraphCtx
     );
 
-    visitor.visitPerformProcedureStatement(mockedCtx);
+    visitor.visitPerformProcedureStatement(stubCtx);
 
-    expect(visitor.calleeToCallersMap.has(procedureName)).to.be.true;
-    expect(visitor.calleeToCallersMap.get(procedureName)).to.have.members([
-      callerNodeName,
-    ]);
-    expect(visitor.callerToCalleesMap.has(callerNodeName)).to.be.true;
-    expect(visitor.callerToCalleesMap.get(callerNodeName)).to.have.members([
+    expect(
+      visitor.calleeToCallersMap.get(procedureName),
+      "Callee To Callers Map"
+    ).to.have.members([callerId]);
+    expect(
+      visitor.callerToCalleesMap.get(callerId),
+      "Caller To Callees Map"
+    ).to.have.members([procedureName]);
+  });
+
+  test("caller (conditionNode) and callee to be captured correctly in visitPerformProcedureStatement", function () {
+    const callerStartLineNumber = 235;
+    const callerEndLineNumber = 256;
+    const callerId = callerStartLineNumber.toString();
+    let stubConditionCtx = createStubParserRuleCtx(
+      sinon.createStubInstance(IfStatementContext),
+      "",
+      callerStartLineNumber,
+      callerEndLineNumber
+    ) as IfStatementContext;
+
+    const procedureName = "1000-INIT";
+    const stubCtx = createStubPerformProcedureStatementCtx(
       procedureName,
-    ]);
+      stubConditionCtx
+    );
+  });
+
+  test("caller (loop node) and callee to be captured correctly in visitPerformProcedureStatement", function () {
+    const callerStartLineNumber = 235;
+    const callerEndLineNumber = 256;
+    const callerId = callerStartLineNumber.toString();
+    let stubPerformInlineCtx = createStubParserRuleCtx(
+      sinon.createStubInstance(PerformInlineStatementContext),
+      "",
+      callerStartLineNumber,
+      callerEndLineNumber
+    ) as PerformInlineStatementContext;
+
+    const procedureName = "1000-INIT";
+    const stubCtx = createStubPerformProcedureStatementCtx(
+      procedureName,
+      stubPerformInlineCtx
+    );
+
+    visitor.visitPerformProcedureStatement(stubCtx);
+
+    expect(
+      visitor.calleeToCallersMap.get(procedureName),
+      "Callee To Callers Map"
+    ).to.have.members([callerId]);
+    expect(
+      visitor.callerToCalleesMap.get(callerId),
+      "Caller To Callees Map"
+    ).to.have.members([procedureName]);
   });
 
   test("caller can have multiple callees", function () {
-    const callerNodeName = "0000-MAIN-ROUTINE";
+    const callerNodeName = "IF OFFICIAL-RATE EQUALS ZEROES";
     const callerStartLineNumber = 235;
     const callerEndLineNumber = 256;
-    const mockedParagraphCtx: ParagraphContext = createMockedParagraphCtx(
+    const callerId = callerStartLineNumber.toString();
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
       callerNodeName,
       callerStartLineNumber,
       callerEndLineNumber
     ) as unknown as ParagraphContext;
 
     const procedureName1 = "1000-INIT";
-    const mockedCtx1 = createMockedPerformProcedureStatementCtx(
+    const stubCtx1 = createStubPerformProcedureStatementCtx(
       procedureName1,
-      mockedParagraphCtx
+      stubParagraphCtx
     );
 
     const procedureName2 = "2000-PROCESS";
-    const mockedCtx2 = createMockedPerformProcedureStatementCtx(
+    const stubCtx2 = createStubPerformProcedureStatementCtx(
       procedureName2,
-      mockedParagraphCtx
+      stubParagraphCtx
     );
 
-    visitor.visitPerformProcedureStatement(mockedCtx1);
-    visitor.visitPerformProcedureStatement(mockedCtx2);
+    visitor.visitPerformProcedureStatement(stubCtx1);
+    visitor.visitPerformProcedureStatement(stubCtx2);
 
-    expect(visitor.callerToCalleesMap.has(callerNodeName)).to.be.true;
-    expect(visitor.callerToCalleesMap.get(callerNodeName)).to.have.members([
-      procedureName1,
-      procedureName2,
-    ]);
-    expect(visitor.calleeToCallersMap.has(procedureName1)).to.be.true;
-    expect(visitor.calleeToCallersMap.get(procedureName1)).to.have.members([
-      callerNodeName,
-    ]);
-    expect(visitor.calleeToCallersMap.has(procedureName2)).to.be.true;
-    expect(visitor.calleeToCallersMap.get(procedureName2)).to.have.members([
-      callerNodeName,
-    ]);
+    expect(
+      visitor.callerToCalleesMap.get(callerId),
+      "Caller to Callees Map"
+    ).to.have.members([procedureName1, procedureName2]);
+    expect(
+      visitor.calleeToCallersMap.get(procedureName1),
+      "Callee to Caller Map - Procedure1"
+    ).to.have.members([callerId]);
+    expect(
+      visitor.calleeToCallersMap.get(procedureName2),
+      "Callee to Caller Map - Procedure2"
+    ).to.have.members([callerId]);
   });
 
   test("callee can have multiple callers", function () {
-    const callerNode1Name = "0000-MAIN-ROUTINE";
-    const callerStartLineNumber = 235;
-    const callerEndLineNumber = 256;
-    const mockedParagraphCtx1: ParagraphContext = createMockedParagraphCtx(
-      callerNode1Name,
-      callerStartLineNumber,
-      callerEndLineNumber
-    ) as unknown as ParagraphContext;
-
-    const callerNode2Name = "1000-INIT";
-    const mockedParagraphCtx2: ParagraphContext = createMockedParagraphCtx(
-      callerNode2Name,
-      callerStartLineNumber,
-      callerEndLineNumber
-    ) as unknown as ParagraphContext;
-
+    const caller1Name = "0000-MAIN-ROUTINE";
+    const caller1StartLineNumber = 235;
+    const caller1EndLineNumber = 256;
+    const caller1ID = caller1StartLineNumber.toString();
+    const caller2Name = "1000-INIT";
+    const caller2StartLineNumber = 300;
+    const caller2EndLineNumber = 450;
+    const caller2ID = caller2StartLineNumber.toString();
     const procedureName = "2000-INIT";
-    const mockedCtx1 = createMockedPerformProcedureStatementCtx(
+
+    const stubParagraphCtx1: ParagraphContext = createStubParagraphCtx(
+      caller1Name,
+      caller1StartLineNumber,
+      caller1EndLineNumber
+    ) as unknown as ParagraphContext;
+
+    const stubParagraphCtx2: ParagraphContext = createStubParagraphCtx(
+      caller2Name,
+      caller2StartLineNumber,
+      caller2EndLineNumber
+    ) as unknown as ParagraphContext;
+
+    const stubCtx1 = createStubPerformProcedureStatementCtx(
       procedureName,
-      mockedParagraphCtx1
+      stubParagraphCtx1
     );
 
-    const mockedCtx2 = createMockedPerformProcedureStatementCtx(
+    const stubCtx2 = createStubPerformProcedureStatementCtx(
       procedureName,
-      mockedParagraphCtx2
+      stubParagraphCtx2
     );
 
-    visitor.visitPerformProcedureStatement(mockedCtx1);
-    visitor.visitPerformProcedureStatement(mockedCtx2);
+    visitor.visitPerformProcedureStatement(stubCtx1);
+    visitor.visitPerformProcedureStatement(stubCtx2);
 
-    expect(visitor.calleeToCallersMap.has(procedureName)).to.be.true;
-    expect(visitor.calleeToCallersMap.get(procedureName)).to.have.members([
-      callerNode1Name,
-      callerNode2Name,
-    ]);
-
-    expect(visitor.callerToCalleesMap.has(callerNode1Name)).to.be.true;
-    expect(visitor.callerToCalleesMap.get(callerNode1Name)).to.have.members([
-      procedureName,
-    ]);
-    expect(visitor.callerToCalleesMap.has(callerNode2Name)).to.be.true;
-    expect(visitor.callerToCalleesMap.get(callerNode2Name)).to.have.members([
-      procedureName,
-    ]);
+    expect(
+      visitor.calleeToCallersMap.get(procedureName),
+      "Callee to Callers Map"
+    ).to.have.members([caller1ID, caller2ID]);
+    expect(
+      visitor.callerToCalleesMap.get(caller1ID),
+      "Caller to Callees Map - Caller1"
+    ).to.have.members([procedureName]);
+    expect(
+      visitor.callerToCalleesMap.get(caller2ID),
+      "Caller to Callees Map - Caller2"
+    ).to.have.members([procedureName]);
   });
 
   test("visitPerformProcedureStatement call visitChildren once at the end", function () {
@@ -468,19 +489,19 @@ suite("Tests for Control Flow Visitor", () => {
     const callerNodeName = "0000-MAIN-ROUTINE";
     const callerStartLineNumber = 235;
     const callerEndLineNumber = 256;
-    const mockedParagraphCtx: ParagraphContext = createMockedParagraphCtx(
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
       callerNodeName,
       callerStartLineNumber,
       callerEndLineNumber
     ) as unknown as ParagraphContext;
 
     const procedureName = "1000-INIT";
-    const mockedCtx = createMockedPerformProcedureStatementCtx(
+    const stubCtx = createStubPerformProcedureStatementCtx(
       procedureName,
-      mockedParagraphCtx
+      stubParagraphCtx
     );
 
-    visitor.visitPerformProcedureStatement(mockedCtx);
+    visitor.visitPerformProcedureStatement(stubCtx);
 
     expect(visitChildrenStub).to.have.been.calledOnce;
   });
@@ -491,37 +512,81 @@ suite("Tests for Control Flow Visitor", () => {
     const expectedEndLineNumber = 253;
     const expectedNodeId = expectedStartLineNumber.toString();
 
-    let mockedCtx = createMockedParserRuleCtx(
+    let stubCtx = createStubParserRuleCtx(
       sinon.createStubInstance(IfStatementContext),
       "",
       expectedStartLineNumber,
       expectedEndLineNumber
     ) as IfStatementContext;
 
-    initIfStatementCtx(mockedCtx, expectedNodeName);
+    initIfStatementCtx(stubCtx, expectedNodeName);
+
+    visitor.visitIfStatement(stubCtx);
+
+    const actual = visitor.nodes[0];
+    const expected = formNode(
+      expectedNodeId,
+      expectedNodeName,
+      NodeType.CONDITION,
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    );
+
+    expect(actual).to.deep.equal(expected);
+  });
+
+  test("visitIfStatement capture caller and callee data correctly", function () {
+    const conditionNodeName = "IF OFFICIAL-RATE EQUALS ZEROES";
+    const condtionStartLineNumber = 245;
+    const condtionEndLineNumber = 253;
+    const condtionNodeId = condtionStartLineNumber.toString();
     const caller = "1000-INIT";
-    const mockedParagraphCtx: ParagraphContext = createMockedParagraphCtx(
+    const callerStartLineNumber = 100;
+    const callerEndLineNumber = 200;
+    const callerID = callerStartLineNumber.toString();
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
       caller,
+      callerStartLineNumber,
+      callerEndLineNumber
+    ) as ParagraphContext;
+
+    let stubCtx = createStubParserRuleCtx(
+      sinon.createStubInstance(IfStatementContext),
+      "",
+      condtionStartLineNumber,
+      condtionEndLineNumber
+    ) as IfStatementContext;
+
+    initIfStatementCtx(stubCtx, conditionNodeName);
+    setParent(stubCtx, stubParagraphCtx);
+
+    visitor.visitIfStatement(stubCtx);
+
+    expect(
+      visitor.callerToCalleesMap.get(callerID),
+      "Caller to Callees Map"
+    ).to.have.members([condtionNodeId]);
+    expect(
+      visitor.calleeToCallersMap.get(condtionNodeId),
+      "Callee to Caller Map"
+    ).to.have.members([callerID]);
+  });
+
+  test("visitIfStatement call visitChildren once at the end", function () {
+    const visitChildrenStub = sinon.stub(visitor, "visitChildren");
+
+    let stubCtx = createStubParserRuleCtx(
+      sinon.createStubInstance(IfStatementContext),
+      "",
       0,
       0
-    ) as ParagraphContext;
-    setParent(mockedCtx, mockedParagraphCtx);
+    ) as IfStatementContext;
 
-    visitor.visitIfStatement(mockedCtx);
+    initIfStatementCtx(stubCtx, "");
 
-    const conditionNode = visitor.nodes[0];
+    visitor.visitIfStatement(stubCtx);
 
-    expect(conditionNode).to.not.be.undefined;
-    expect(conditionNode.label).to.equal(expectedNodeName);
-    expect(conditionNode.id).to.equal(expectedNodeId);
-    expect(conditionNode.startLineNumber).to.equal(expectedStartLineNumber);
-    expect(conditionNode.endLineNumber).to.equal(expectedEndLineNumber);
-    expect(visitor.callerToCalleesMap.get(caller)).to.have.members([
-      expectedNodeId,
-    ]);
-    expect(visitor.calleeToCallersMap.get(expectedNodeId)).to.have.members([
-      caller,
-    ]);
+    expect(visitChildrenStub).to.have.been.calledOnce;
   });
 
   test("the Else node data to be captured correctly", function () {
@@ -529,67 +594,73 @@ suite("Tests for Control Flow Visitor", () => {
     const expectedStartLineNumber = 245;
     const expectedEndLineNumber = 253;
     const expectedNodeId = expectedStartLineNumber.toString();
+    const conditionNodeStartLineNumber = 230;
+    const conditionNodeEndLineNumber = 260;
+    const conditionNodeId = conditionNodeStartLineNumber.toString();
 
-    let mockedCtx = createMockedParserRuleCtx(
+    let stubConditionCtx = createStubParserRuleCtx(
       sinon.createStubInstance(IfStatementContext),
       "",
-      230,
-      260
+      conditionNodeStartLineNumber,
+      conditionNodeEndLineNumber
     ) as IfStatementContext;
 
-    initIfStatementCtx(mockedCtx, expectedNodeName);
-    const mockedIfElseCtx = createMockedParserRuleCtx(
+    const stubIfElseCtx = createStubParserRuleCtx(
       sinon.createStubInstance(IfElseContext),
       "",
       expectedStartLineNumber,
       expectedEndLineNumber
     ) as IfElseContext;
 
-    const mockedElseTerminalNode: TerminalNode = {
+    const stubElseTerminalNode: TerminalNode = {
       text: "ELSE",
     } as TerminalNode;
 
-    mockedIfElseCtx.ELSE = () => mockedElseTerminalNode;
-    mockedCtx.ifElse = () => mockedIfElseCtx;
+    stubIfElseCtx.ELSE = () => stubElseTerminalNode;
 
-    const caller = "1000-INIT";
-    const mockedParagraphCtx: ParagraphContext = createMockedParagraphCtx(
-      caller,
-      0,
-      0
-    ) as ParagraphContext;
-    setParent(mockedCtx, mockedParagraphCtx);
+    setParent(stubIfElseCtx, stubConditionCtx);
 
-    visitor.visitIfStatement(mockedCtx);
+    visitor.visitIfElse(stubIfElseCtx);
 
-    const elseNode = visitor.nodes[1];
-
-    expect(elseNode).to.not.be.undefined;
-    expect(elseNode.label).to.equal(expectedNodeName);
-    expect(elseNode.id).to.equal(expectedNodeId);
-    expect(elseNode.startLineNumber).to.equal(expectedStartLineNumber);
-    expect(elseNode.endLineNumber).to.equal(expectedEndLineNumber);
-    expect(visitor.callerToCalleesMap.get(caller)).to.contain.members([
+    const actual = visitor.nodes[0];
+    const expected = formNode(
       expectedNodeId,
-    ]);
-    expect(visitor.calleeToCallersMap.get(expectedNodeId)).to.have.members([
-      caller,
-    ]);
+      expectedNodeName,
+      NodeType.CONDITION_ELSE,
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    );
+
+    expect(actual).to.deep.equal(expected);
+    expect(
+      visitor.callerToCalleesMap.get(conditionNodeId),
+      "Caller to Callees Map"
+    ).to.contain.members([actual.id]);
+    expect(
+      visitor.calleeToCallersMap.get(actual.id),
+      "Callee to Callers Map"
+    ).to.have.members([conditionNodeId]);
   });
 
-  test("visitIfStatement call visitChildren once at the end", function () {
+  test("visitIfElse call visitChildren once at the end", function () {
+    const startLineNumber = 245;
+    const endLineNumber = 253;
     const visitChildrenStub = sinon.stub(visitor, "visitChildren");
 
-    let mockedCtx = createMockedParserRuleCtx(
-      sinon.createStubInstance(IfStatementContext),
+    const stubIfElseCtx = createStubParserRuleCtx(
+      sinon.createStubInstance(IfElseContext),
       "",
-      0,
-      0
-    ) as IfStatementContext;
+      startLineNumber,
+      endLineNumber
+    ) as IfElseContext;
 
-    initIfStatementCtx(mockedCtx, "");
+    const stubElseTerminalNode: TerminalNode = {
+      text: "ELSE",
+    } as TerminalNode;
 
-    visitor.visitIfStatement(mockedCtx);
+    stubIfElseCtx.ELSE = () => stubElseTerminalNode;
+
+    visitor.visitIfElse(stubIfElseCtx);
 
     expect(visitChildrenStub).to.have.been.calledOnce;
   });
@@ -600,7 +671,7 @@ suite("Tests for Control Flow Visitor", () => {
     const expectedEndLineNumber = 253;
     const expectedNodeId = expectedStartLineNumber.toString();
 
-    const mockedPerformInlineStatementCtx = createMockedParserRuleCtx(
+    const stubPerformInlineStatementCtx = createStubParserRuleCtx(
       sinon.createStubInstance(PerformInlineStatementContext),
       "",
       expectedStartLineNumber,
@@ -608,53 +679,59 @@ suite("Tests for Control Flow Visitor", () => {
     ) as PerformInlineStatementContext;
 
     initPerformInlineStatementCtx(
-      mockedPerformInlineStatementCtx,
+      stubPerformInlineStatementCtx,
       expectedNodeName
     );
 
     const caller = "1000-INIT";
-    const mockedParagraphCtx: ParagraphContext = createMockedParagraphCtx(
+    const callerStartLineNumber = 100;
+    const callerEndLineNumber = 200;
+    const callerID = callerStartLineNumber.toString();
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
       caller,
-      0,
-      0
+      callerStartLineNumber,
+      callerEndLineNumber
     ) as ParagraphContext;
-    setParent(mockedPerformInlineStatementCtx, mockedParagraphCtx);
+    setParent(stubPerformInlineStatementCtx, stubParagraphCtx);
 
-    visitor.visitPerformInlineStatement(mockedPerformInlineStatementCtx);
+    visitor.visitPerformInlineStatement(stubPerformInlineStatementCtx);
 
-    const loopNode = visitor.nodes[0];
+    const actual = visitor.nodes[0];
+    const expected = formNode(
+      expectedNodeId,
+      expectedNodeName,
+      NodeType.LOOP,
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    );
 
-    expect(loopNode.label).to.equal(expectedNodeName);
-    expect(loopNode.id).to.equal(expectedNodeId);
-    expect(loopNode.startLineNumber).to.equal(expectedStartLineNumber);
-    expect(loopNode.endLineNumber).to.equal(expectedEndLineNumber);
-    expect(loopNode.type).to.equal(NodeType.LOOP);
-    expect(visitor.callerToCalleesMap.get(caller)).to.have.members([
+    expect(actual).to.deep.equal(expected);
+    expect(visitor.callerToCalleesMap.get(callerID)).to.have.members([
       expectedNodeId,
     ]);
     expect(visitor.calleeToCallersMap.get(expectedNodeId)).to.have.members([
-      caller,
+      callerID,
     ]);
   });
 
   test("visitPerformInlineStatement call visitChildren once at the end", function () {
     const visitChildrenStub = sinon.stub(visitor, "visitChildren");
 
-    const mockedPerformInlineStatementCtx = createMockedParserRuleCtx(
+    const stubPerformInlineStatementCtx = createStubParserRuleCtx(
       sinon.createStubInstance(PerformInlineStatementContext),
       "",
       0,
       0
     ) as PerformInlineStatementContext;
 
-    initPerformInlineStatementCtx(mockedPerformInlineStatementCtx, "");
+    initPerformInlineStatementCtx(stubPerformInlineStatementCtx, "");
 
-    visitor.visitPerformInlineStatement(mockedPerformInlineStatementCtx);
+    visitor.visitPerformInlineStatement(stubPerformInlineStatementCtx);
 
     expect(visitChildrenStub).to.have.been.calledOnce;
   });
 
-  function createLastNodeCtx(): ParserRuleContext {
+  function createEOF(): ParserRuleContext {
     const stopNode = sinon.createStubInstance(ParserRuleContext);
     const token: Token = {
       type: Token.EOF,
@@ -663,441 +740,500 @@ suite("Tests for Control Flow Visitor", () => {
     return stopNode;
   }
 
-  function getEndNode(): Node {
-    return {
-      id: "200",
-      callers: [],
-      callees: [],
-      startLineNumber: 200,
-      endLineNumber: 200,
-      label: "0000-END",
-      type: NodeType.END,
-    };
-  }
+  test("when visitChildren get EOF, throw error if the start node not found in the visitor nodes", function () {
+    const eof = createEOF();
 
-  test("when the last node visited, throw error if the start node not found in the visitor nodes", function () {
-    const endNode: Node = getEndNode();
-    visitor.nodes = [endNode];
-
-    const lastNode = createLastNodeCtx();
-
-    expect(() => visitor.visitChildren(lastNode)).to.throw(
+    expect(() => visitor.visitChildren(eof)).to.throw(
       "Missing start or end node"
     );
   });
 
-  function getStartNode(): Node {
-    return {
-      id: "100",
-      callers: [],
-      callees: [],
-      startLineNumber: 100,
-      endLineNumber: 200,
-      label: "0000-START",
-      type: NodeType.START,
-    };
-  }
+  test("when visitChildren get EOF, callers and callees of the node are populated correctly", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
 
-  test("when the last node visited, throw error if the end node not found in the visitor nodes", function () {
-    const startNode: Node = getStartNode();
-
-    visitor.nodes = [startNode];
-
-    const lastNode = createLastNodeCtx();
-
-    expect(() => visitor.visitChildren(lastNode)).to.throw(
-      "Missing start or end node"
+    const normalNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400);
+    const normalNodeCallee = formNode(
+      "400",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      300,
+      400
     );
+
+    visitor.callerToCalleesMap.set(startNode.id, [normalNode.label]);
+    visitor.calleeToCallersMap.set(normalNode.label, [startNode.id]);
+    visitor.callerToCalleesMap.set(normalNode.id, [normalNodeCallee.label]);
+    visitor.calleeToCallersMap.set(normalNodeCallee.label, [normalNode.id]);
+    visitor.nodes = [startNode, normalNode, normalNodeCallee];
+
+    const eof = createEOF();
+    visitor.visitChildren(eof);
+
+    const expectedStartNode = structuredClone(startNode);
+    const expectedNormalNode = structuredClone(normalNode);
+    const expectedNormalNodeCallee = structuredClone(normalNodeCallee);
+    expectedStartNode.callees = [normalNode.id];
+    expectedNormalNode.callers = [startNode.id];
+    expectedNormalNode.callees = [normalNodeCallee.id];
+    expectedNormalNodeCallee.callers = [normalNode.id];
+
+    expect(startNode).to.deep.equal(expectedStartNode);
+    expect(normalNode).to.deep.equal(expectedNormalNode);
+    expect(normalNodeCallee).to.deep.equal(expectedNormalNodeCallee);
   });
 
-  test("when the last node visited, throw error if both start node and end node not found in the visitor nodes", function () {
-    visitor.nodes = [];
-
-    const lastNode = createLastNodeCtx();
-
-    expect(() => visitor.visitChildren(lastNode)).to.throw(
-      "Missing start or end node"
-    );
-  });
-
-  test("when the last node visited, the normal node with no caller will be removed", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
-    const normalNodeLabelWithNoCaller = "1000-INIT";
-
-    const normalNodeWithNoCaller: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 400,
-      endLineNumber: 500,
-      label: normalNodeLabelWithNoCaller,
-      type: NodeType.NORMAL,
-    };
-
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.nodes = [startNode, endNode, normalNodeWithNoCaller];
-
-    const lastNode = createLastNodeCtx();
-
-    visitor.visitChildren(lastNode);
-
-    expect(visitor.nodes.length).to.equal(2);
-    expect(visitor.nodes).to.have.members([startNode, endNode]);
-  });
-
-  test("when the last node visited, the condition node with no caller will be removed", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
-    const conditionNodeLabelWithNoCaller = "IF OFFICIAL-RATE EQUALS ZEROES";
-
-    const conditionNodeWithNoCaller: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 400,
-      endLineNumber: 500,
-      label: conditionNodeLabelWithNoCaller,
-      type: NodeType.CONDITION,
-    };
-
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.nodes = [startNode, endNode, conditionNodeWithNoCaller];
-
-    const lastNode = createLastNodeCtx();
-
-    visitor.visitChildren(lastNode);
-
-    expect(visitor.nodes.length).to.equal(2);
-    expect(visitor.nodes).to.have.members([startNode, endNode]);
-  });
-
-  test("when the last node visited, the loop node with no caller will be removed", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
-    const loopNodeLabelWithNoCaller = "PERFORM UNTIL SQLCODE = CC-NOT-FOUND";
-
-    const loopNodeWithNoCaller: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 400,
-      endLineNumber: 500,
-      label: loopNodeLabelWithNoCaller,
-      type: NodeType.LOOP,
-    };
-
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.nodes = [startNode, endNode, loopNodeWithNoCaller];
-
-    const lastNode = createLastNodeCtx();
-
-    visitor.visitChildren(lastNode);
-
-    expect(visitor.nodes.length).to.equal(2);
-    expect(visitor.nodes).to.have.members([startNode, endNode]);
-  });
-
-  test("when the last node visited, the callees of the node with no caller will be removed if only has one caller", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
-    const normalNodeLabelWithNoCaller = "1000-INIT";
-
-    const normalNodeWithNoCaller: Node = {
-      id: "700",
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 800,
-      label: normalNodeLabelWithNoCaller,
-      type: NodeType.NORMAL,
-    };
-
-    const calleeNodeWithOneCaller: Node = {
-      id: "900",
-      callers: [],
-      callees: [],
-      startLineNumber: 900,
-      endLineNumber: 1000,
-      label: "1100-TEST-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    const calleeNodeWithMultipleCaller: Node = {
-      id: "1000",
-      callers: [],
-      callees: [],
-      startLineNumber: 1000,
-      endLineNumber: 1100,
-      label: "1200-TEST-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.calleeToCallersMap.set(calleeNodeWithOneCaller.label, [
-      normalNodeWithNoCaller.label,
-    ]);
-    visitor.calleeToCallersMap.set(calleeNodeWithMultipleCaller.label, [
-      startNode.label,
-      normalNodeWithNoCaller.label,
-    ]);
-    visitor.callerToCalleesMap.set(startNode.label, [
-      calleeNodeWithMultipleCaller.label,
-      endNode.label,
-    ]);
-    visitor.callerToCalleesMap.set(normalNodeWithNoCaller.label, [
-      calleeNodeWithOneCaller.label,
-      calleeNodeWithMultipleCaller.label,
-    ]);
-    visitor.nodes = [
-      startNode,
-      endNode,
-      normalNodeWithNoCaller,
-      calleeNodeWithOneCaller,
-      calleeNodeWithMultipleCaller,
-    ];
-
-    const lastNode = createLastNodeCtx();
-
-    visitor.visitChildren(lastNode);
-
-    expect(visitor.nodes.length).to.equal(3);
-    expect(visitor.nodes).to.have.members([
-      startNode,
-      calleeNodeWithMultipleCaller,
-      endNode,
-    ]);
-  });
-
-  test("when the last node visited, the callees of the node with no caller will be removed RECURSIVELY if only has one caller", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
-    const normalNodeLabelWithNoCaller = "1000-INIT";
-
-    const normalNodeWithNoCaller: Node = {
-      id: "700",
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 800,
-      label: normalNodeLabelWithNoCaller,
-      type: NodeType.NORMAL,
-    };
-
-    const calleeNodeWithOneCaller: Node = {
-      id: "800",
-      callers: [],
-      callees: [],
-      startLineNumber: 800,
-      endLineNumber: 900,
-      label: "1100-TEST-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    const calleeNodeWithOneCaller2: Node = {
-      id: "900",
-      callers: [],
-      callees: [],
-      startLineNumber: 900,
-      endLineNumber: 1000,
-      label: "1200-TEST-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.calleeToCallersMap.set(calleeNodeWithOneCaller.label, [
-      normalNodeWithNoCaller.label,
-    ]);
-    visitor.calleeToCallersMap.set(calleeNodeWithOneCaller2.label, [
-      calleeNodeWithOneCaller.label,
-    ]);
-    visitor.callerToCalleesMap.set(startNode.label, [endNode.label]);
-    visitor.callerToCalleesMap.set(normalNodeWithNoCaller.label, [
-      calleeNodeWithOneCaller.label,
-    ]);
-    visitor.callerToCalleesMap.set(calleeNodeWithOneCaller.label, [
-      calleeNodeWithOneCaller2.label,
-    ]);
-    visitor.nodes = [
-      startNode,
-      endNode,
-      normalNodeWithNoCaller,
-      calleeNodeWithOneCaller,
-      calleeNodeWithOneCaller2,
-    ];
-
-    const lastNode = createLastNodeCtx();
-
-    visitor.visitChildren(lastNode);
-
-    expect(visitor.nodes.length).to.equal(2);
-    expect(visitor.nodes).to.have.members([startNode, endNode]);
-  });
-
-  test("callers and callees of the node will not be populated unless the last node visisted", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
+  test("callers and callees of the node will not be populated unless visitChildren get EOF", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
     const normalNodeLabel = "1000-INIT";
 
-    const normalNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 400,
-      endLineNumber: 500,
-      label: normalNodeLabel,
-      type: NodeType.NORMAL,
-    };
+    const normalNode = formNode(
+      "400",
+      normalNodeLabel,
+      NodeType.NORMAL,
+      400,
+      500
+    );
 
-    visitor.calleeToCallersMap.set(normalNode.label, [startNode.label]);
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.callerToCalleesMap.set(startNode.label, [
-      normalNode.label,
-      endNode.label,
-    ]);
-    visitor.nodes = [startNode, endNode, normalNode];
+    visitor.calleeToCallersMap.set(normalNode.label, [startNode.id]);
+    visitor.callerToCalleesMap.set(startNode.id, [normalNode.label]);
+    visitor.nodes = [startNode, normalNode];
 
-    visitor.visitChildren(sinon.createStubInstance(ParserRuleContext));
+    const notEOF = sinon.createStubInstance(ParserRuleContext);
+    visitor.visitChildren(notEOF);
 
-    expect(normalNode.callees).to.be.empty;
-    expect(normalNode.callers).to.be.empty;
+    expect(normalNode.callees, "callees").to.be.empty;
+    expect(normalNode.callers, "callers").to.be.empty;
   });
 
-  test("when the last node visisted, callers and callees of the normal node are populated correctly", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
+  test("when visitChildren get EOF, the normal node with no caller will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const normalNodeLabelWithNoCaller = "1000-INIT";
 
-    const normalNode: Node = {
-      id: "700",
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 750,
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-    };
-    const normalNodeCallee: Node = {
-      id: "800",
-      callers: [],
-      callees: [],
-      startLineNumber: 800,
-      endLineNumber: 850,
-      label: "2000-PROCESS",
-      type: NodeType.NORMAL,
-    };
+    const normalNodeWithNoCaller = formNode(
+      "400",
+      normalNodeLabelWithNoCaller,
+      NodeType.NORMAL,
+      400,
+      500
+    );
 
-    visitor.calleeToCallersMap.set(normalNode.label, [startNode.label]);
-    visitor.calleeToCallersMap.set(normalNodeCallee.label, [normalNode.label]);
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
+    visitor.nodes = [startNode, normalNodeWithNoCaller];
 
-    visitor.callerToCalleesMap.set(normalNode.label, [normalNodeCallee.label]);
-    visitor.callerToCalleesMap.set(startNode.label, [
-      normalNode.label,
-      endNode.label,
-    ]);
-    visitor.nodes = [startNode, endNode, normalNode, normalNodeCallee];
+    const eof = createEOF();
 
-    const lastNode = createLastNodeCtx();
-    visitor.visitChildren(lastNode);
+    visitor.visitChildren(eof);
 
-    expect(normalNode.callees).to.have.members([normalNodeCallee.id]);
-    expect(normalNode.callers).to.have.members([startNode.id]);
-    expect(normalNodeCallee.callers).to.have.members([normalNode.id]);
-    expect(startNode.callees).to.have.members([normalNode.id, endNode.id]);
-    expect(endNode.callers).to.have.members([startNode.id]);
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
   });
 
-  test("when the last node visisted, callers of the condition node are populated correctly", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
-    const conditionNodeId = "700";
+  test("when visitChildren get EOF, the callees will be removed if its caller is removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const normalNodeLabelWithNoCaller = "1000-INIT";
 
-    const conditionNode: Node = {
-      id: conditionNodeId,
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 750,
-      label: "IF OFFICIAL-RATE EQUALS ZEROES",
-      type: NodeType.CONDITION,
-    };
+    const normalNodeWithNoCaller = formNode(
+      "400",
+      normalNodeLabelWithNoCaller,
+      NodeType.NORMAL,
+      400,
+      500
+    );
 
+    const calleeNode = formNode(
+      "501",
+      "1100-TEST-INIT",
+      NodeType.NORMAL,
+      501,
+      600
+    );
+
+    visitor.callerToCalleesMap.set(normalNodeWithNoCaller.id, [
+      calleeNode.label,
+    ]);
+    visitor.calleeToCallersMap.set(calleeNode.label, [
+      normalNodeWithNoCaller.id,
+    ]);
+
+    visitor.nodes = [startNode, normalNodeWithNoCaller, calleeNode];
+
+    const eof = createEOF();
+
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
+  });
+
+  test("when visitChildren get EOF, the descesdant callees will be removed RECURSIVELY if its ancestor caller is removed", function () {
+    const startNode: Node = formNode(
+      "100",
+      "0000-START",
+      NodeType.START,
+      100,
+      200
+    );
+
+    const ancestorNode = formNode(
+      "200",
+      "1000-INIT",
+      NodeType.NORMAL,
+      200,
+      300
+    );
+
+    const calleeNode = formNode(
+      "301",
+      "1100-TEST-INIT",
+      NodeType.NORMAL,
+      301,
+      400
+    );
+
+    const calleeNodeDescendant = formNode(
+      "401",
+      "1200-TEST-INIT",
+      NodeType.NORMAL,
+      401,
+      500
+    );
+
+    visitor.callerToCalleesMap.set(ancestorNode.id, [calleeNode.id]);
+    visitor.calleeToCallersMap.set(calleeNode.id, [ancestorNode.id]);
+    visitor.callerToCalleesMap.set(calleeNode.id, [calleeNodeDescendant.id]);
+    visitor.calleeToCallersMap.set(calleeNodeDescendant.id, [calleeNode.id]);
+    visitor.nodes = [startNode, ancestorNode, calleeNode, calleeNodeDescendant];
+
+    const eof = createEOF();
+
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
+  });
+
+  test("when visitChildren get EOF, the condition node with no callee will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const conditionNode = formNode(
+      "400",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      400,
+      500
+    );
+
+    visitor.callerToCalleesMap.set(startNode.label, [conditionNode.id]);
     visitor.calleeToCallersMap.set(conditionNode.id, [startNode.label]);
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.callerToCalleesMap.set(startNode.label, [
-      conditionNode.id,
-      endNode.label,
-    ]);
-    visitor.nodes = [startNode, endNode, conditionNode];
 
-    const lastNode = createLastNodeCtx();
-    visitor.visitChildren(lastNode);
+    visitor.nodes = [startNode, conditionNode];
 
-    expect(conditionNode.callers).to.have.members([startNode.id]);
-    expect(startNode.callees).to.have.members([conditionNode.id, endNode.id]);
-    expect(endNode.callers).to.have.members([startNode.id]);
+    const eof = createEOF();
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
   });
 
-  test("when the last node visisted, callers of the else node are populated correctly", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
-    const elseNodeId = "700";
-    const elseNodeLabel = "ELSE";
+  test("when visitChildren get EOF, the condition node will be removed when there's no descendant is a normal node", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
 
-    const elseNode: Node = {
-      id: elseNodeId,
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 750,
-      label: elseNodeLabel,
-      type: NodeType.CONDITION_ELSE,
-    };
+    const conditionNode = formNode(
+      "400",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      400,
+      800
+    );
 
-    visitor.calleeToCallersMap.set(elseNode.id, [startNode.label]);
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.callerToCalleesMap.set(startNode.label, [
+    const nestedConditionNode = formNode(
+      "501",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      501,
+      600
+    );
+
+    const nestedElseNode = formNode(
+      "550",
+      "ELSE",
+      NodeType.CONDITION_ELSE,
+      550,
+      600
+    );
+
+    const elseNode = formNode("601", "ELSE", NodeType.CONDITION_ELSE, 601, 700);
+
+    visitor.callerToCalleesMap.set(startNode.label, [conditionNode.id]);
+    visitor.calleeToCallersMap.set(conditionNode.id, [startNode.label]);
+    visitor.callerToCalleesMap.set(conditionNode.id, [
+      nestedConditionNode.id,
       elseNode.id,
-      endNode.label,
     ]);
-    visitor.nodes = [startNode, endNode, elseNode];
+    visitor.calleeToCallersMap.set(nestedConditionNode.id, [conditionNode.id]);
+    visitor.calleeToCallersMap.set(elseNode.id, [conditionNode.id]);
+    visitor.callerToCalleesMap.set(nestedConditionNode.id, [nestedElseNode.id]);
+    visitor.calleeToCallersMap.set(nestedElseNode.id, [nestedConditionNode.id]);
 
-    const lastNode = createLastNodeCtx();
-    visitor.visitChildren(lastNode);
+    visitor.nodes = [
+      startNode,
+      conditionNode,
+      nestedConditionNode,
+      nestedElseNode,
+      elseNode,
+    ];
 
-    expect(elseNode.callers).to.have.members([startNode.id]);
-    expect(startNode.callees).to.have.members([elseNode.id, endNode.id]);
-    expect(endNode.callers).to.have.members([startNode.id]);
+    const eof = createEOF();
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
   });
 
-  test("when the last node visisted, callers of the loop node are populated correctly", function () {
-    const startNode: Node = getStartNode();
-    const endNode: Node = getEndNode();
-    const loopNodeId = "700";
+  test("when visitChildren get EOF, the condition node will NOT be removed when there's a normal node as descendant", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
 
-    const loopNode: Node = {
-      id: loopNodeId,
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 750,
-      label: "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
-      type: NodeType.LOOP,
-    };
+    const conditionNode = formNode(
+      "400",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      400,
+      800
+    );
 
-    visitor.calleeToCallersMap.set(loopNode.id, [startNode.label]);
-    visitor.calleeToCallersMap.set(endNode.label, [startNode.label]);
-    visitor.callerToCalleesMap.set(startNode.label, [
-      loopNode.id,
-      endNode.label,
+    const nestedConditionNode = formNode(
+      "501",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      501,
+      600
+    );
+
+    const elseNode = formNode("601", "ELSE", NodeType.CONDITION_ELSE, 601, 700);
+    const normalNodeDescendant = formNode(
+      "900",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      900,
+      1000
+    );
+
+    visitor.callerToCalleesMap.set(startNode.label, [conditionNode.id]);
+    visitor.calleeToCallersMap.set(conditionNode.id, [startNode.label]);
+    visitor.callerToCalleesMap.set(conditionNode.id, [
+      nestedConditionNode.id,
+      elseNode.id,
     ]);
-    visitor.nodes = [startNode, endNode, loopNode];
+    visitor.calleeToCallersMap.set(nestedConditionNode.id, [conditionNode.id]);
+    visitor.calleeToCallersMap.set(elseNode.id, [conditionNode.id]);
+    visitor.callerToCalleesMap.set(nestedConditionNode.id, [
+      normalNodeDescendant.label,
+    ]);
+    visitor.calleeToCallersMap.set(normalNodeDescendant.label, [
+      nestedConditionNode.id,
+    ]);
 
-    const lastNode = createLastNodeCtx();
-    visitor.visitChildren(lastNode);
+    visitor.nodes = [
+      startNode,
+      conditionNode,
+      nestedConditionNode,
+      normalNodeDescendant,
+      elseNode,
+    ];
 
-    expect(loopNode.callers).to.have.members([startNode.id]);
-    expect(startNode.callees).to.have.members([loopNode.id, endNode.id]);
-    expect(endNode.callers).to.have.members([startNode.id]);
+    const eof = createEOF();
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(5);
+    expect(visitor.nodes).to.have.members([
+      startNode,
+      conditionNode,
+      nestedConditionNode,
+      normalNodeDescendant,
+      elseNode,
+    ]);
+  });
+
+  test("when visitChildren get EOF, the condition node with no caller will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const conditionNodeLabelWithNoCaller = "IF OFFICIAL-RATE EQUALS ZEROES";
+
+    const conditionNodeWithNoCaller = formNode(
+      "400",
+      conditionNodeLabelWithNoCaller,
+      NodeType.CONDITION,
+      400,
+      500
+    );
+    const conditionNodeCallee = formNode(
+      "501",
+      "1000-INIT",
+      NodeType.NORMAL,
+      501,
+      600
+    );
+
+    visitor.nodes = [startNode, conditionNodeWithNoCaller, conditionNodeCallee];
+    visitor.callerToCalleesMap.set(conditionNodeWithNoCaller.id, [
+      conditionNodeCallee.id,
+    ]);
+    visitor.calleeToCallersMap.set(conditionNodeCallee.id, [
+      conditionNodeWithNoCaller.id,
+    ]);
+
+    const eof = createEOF();
+
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
+  });
+
+  test("when visitChildren get EOF, the loop node with no callee will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const loopNode = formNode(
+      "400",
+      "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
+      NodeType.LOOP,
+      400,
+      500
+    );
+
+    visitor.callerToCalleesMap.set(startNode.label, [loopNode.id]);
+    visitor.calleeToCallersMap.set(loopNode.id, [startNode.label]);
+
+    visitor.nodes = [startNode, loopNode];
+
+    const eof = createEOF();
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
+  });
+
+  test("when visitChildren get EOF, the loop node will be removed when there's no descendant is a normal node", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const loopNode = formNode(
+      "400",
+      "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
+      NodeType.LOOP,
+      400,
+      800
+    );
+
+    const nestedConditionNode = formNode(
+      "501",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      501,
+      600
+    );
+
+    const nestedElseNode = formNode(
+      "550",
+      "ELSE",
+      NodeType.CONDITION_ELSE,
+      550,
+      600
+    );
+
+    visitor.callerToCalleesMap.set(startNode.label, [loopNode.id]);
+    visitor.calleeToCallersMap.set(loopNode.id, [startNode.label]);
+    visitor.callerToCalleesMap.set(loopNode.id, [nestedConditionNode.id]);
+    visitor.calleeToCallersMap.set(nestedConditionNode.id, [loopNode.id]);
+    visitor.callerToCalleesMap.set(nestedConditionNode.id, [nestedElseNode.id]);
+    visitor.calleeToCallersMap.set(nestedElseNode.id, [nestedConditionNode.id]);
+
+    visitor.nodes = [startNode, loopNode, nestedConditionNode, nestedElseNode];
+
+    const eof = createEOF();
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
+  });
+
+  test("when visitChildren get EOF, the loop node will NOT be removed when there's a normal node as descendant", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const loopNode = formNode(
+      "400",
+      "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
+      NodeType.LOOP,
+      400,
+      800
+    );
+
+    const nestedConditionNode = formNode(
+      "501",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      501,
+      600
+    );
+
+    const normalNodeDescendant = formNode(
+      "900",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      900,
+      1000
+    );
+
+    visitor.callerToCalleesMap.set(startNode.label, [loopNode.id]);
+    visitor.calleeToCallersMap.set(loopNode.id, [startNode.label]);
+    visitor.callerToCalleesMap.set(loopNode.id, [nestedConditionNode.id]);
+    visitor.calleeToCallersMap.set(nestedConditionNode.id, [loopNode.id]);
+    visitor.callerToCalleesMap.set(nestedConditionNode.id, [
+      normalNodeDescendant.label,
+    ]);
+    visitor.calleeToCallersMap.set(normalNodeDescendant.label, [
+      nestedConditionNode.id,
+    ]);
+
+    visitor.nodes = [
+      startNode,
+      loopNode,
+      nestedConditionNode,
+      normalNodeDescendant,
+    ];
+
+    const eof = createEOF();
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(4);
+    expect(visitor.nodes).to.have.members([
+      startNode,
+      loopNode,
+      nestedConditionNode,
+      normalNodeDescendant,
+    ]);
+  });
+
+  test("when visitChildren get EOF, the loop node with no caller will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const loopNodeLabelWithNoCaller = "PERFORM UNTIL SQLCODE = CC-NOT-FOUND";
+
+    const loopNodeWithNoCaller = formNode(
+      "400",
+      loopNodeLabelWithNoCaller,
+      NodeType.LOOP,
+      400,
+      500
+    );
+
+    const callee = formNode("501", "2000-PROCESS", NodeType.NORMAL, 501, 600);
+
+    visitor.nodes = [startNode, loopNodeWithNoCaller, callee];
+    visitor.callerToCalleesMap.set(loopNodeWithNoCaller.id, [callee.id]);
+    visitor.calleeToCallersMap.set(callee.id, [loopNodeWithNoCaller.id]);
+
+    const eof = createEOF();
+
+    visitor.visitChildren(eof);
+
+    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.nodes).to.have.members([startNode]);
   });
 });

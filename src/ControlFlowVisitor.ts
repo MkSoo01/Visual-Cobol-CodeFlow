@@ -4,36 +4,34 @@ import * as VisualCobolParser from "./generated/VisualCobolParser";
 import { VisualCobolVisitor } from "./generated/VisualCobolVisitor";
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
 import { ParserRuleContext, Token } from "antlr4ts";
-
-export enum NodeType {
-  START = "start",
-  END = "end",
-  CONDITION = "condition",
-  CONDITION_ELSE = "conditionELSE",
-  LOOP = "loop",
-  NORMAL = "normal",
-}
-
-export interface Node {
-  id: string;
-  label: string;
-  type: NodeType;
-  startLineNumber: number;
-  endLineNumber: number;
-  callers: string[];
-  callees: string[];
-}
+import { Node, NodeType } from "./ControlFlowGraph";
 
 export class ControlFlowVisitor
   extends AbstractParseTreeVisitor<any>
   implements VisualCobolVisitor<any>
 {
-  nodes: Node[] = [];
-  callerToCalleesMap = new Map<string, string[]>();
-  calleeToCallersMap = new Map<string, string[]>();
+  private nodes: Node[] = [];
+  private callerToCalleesMap = new Map<string, string[]>();
+  private calleeToCallersMap = new Map<string, string[]>();
 
   protected defaultResult() {
     return;
+  }
+
+  public getNodes(): Node[] {
+    return this.nodes;
+  }
+
+  public setNodes(nodes: Node[]): void {
+    this.nodes = nodes;
+  }
+
+  public getCallerToCalleesMap(): Map<string, string[]> {
+    return this.callerToCalleesMap;
+  }
+
+  public getCalleeToCallersMap(): Map<string, string[]> {
+    return this.calleeToCallersMap;
   }
 
   private formNode(
@@ -63,7 +61,7 @@ export class ControlFlowVisitor
       ctx.stop ? ctx.stop.line : ctx.start.line
     );
 
-    this.nodes.push(node);
+    this.getNodes().push(node);
 
     if (ctx.paragraphName().text?.startsWith("0000")) {
       node.type = NodeType.START;
@@ -89,16 +87,16 @@ export class ControlFlowVisitor
 
   addToMap(caller: string | undefined, callee: string | undefined) {
     if (caller && callee) {
-      if (this.calleeToCallersMap.has(callee)) {
-        this.calleeToCallersMap.get(callee)?.push(caller);
+      if (this.getCalleeToCallersMap().has(callee)) {
+        this.getCalleeToCallersMap().get(callee)?.push(caller);
       } else {
-        this.calleeToCallersMap.set(callee, [caller]);
+        this.getCalleeToCallersMap().set(callee, [caller]);
       }
 
-      if (this.callerToCalleesMap.has(caller)) {
-        this.callerToCalleesMap.get(caller)?.push(callee);
+      if (this.getCallerToCalleesMap().has(caller)) {
+        this.getCallerToCalleesMap().get(caller)?.push(callee);
       } else {
-        this.callerToCalleesMap.set(caller, [callee]);
+        this.getCallerToCalleesMap().set(caller, [callee]);
       }
     }
   }
@@ -115,7 +113,7 @@ export class ControlFlowVisitor
       ctx.stop ? ctx.stop.line : ctx.start.line
     );
 
-    this.nodes.push(conditionNode);
+    this.getNodes().push(conditionNode);
 
     const ancestor = this.getAncestor(ctx);
     if (ancestor) {
@@ -134,7 +132,7 @@ export class ControlFlowVisitor
       ctx.stop ? ctx.stop.line : ctx.start.line
     );
 
-    this.nodes.push(elseNode);
+    this.getNodes().push(elseNode);
 
     const ancestor = this.getAncestor(ctx);
     if (ancestor) {
@@ -165,7 +163,7 @@ export class ControlFlowVisitor
         this.addToMap(ancestor, performUntilNode.id);
       }
 
-      this.nodes.push(performUntilNode);
+      this.getNodes().push(performUntilNode);
       this.visitChildren(ctx);
     }
   }
@@ -186,7 +184,7 @@ export class ControlFlowVisitor
   private getIdFor(identifiers: string[]): string[] {
     let ids: string[] = [];
     identifiers.forEach((identifier) => {
-      const node = this.nodes.find(
+      const node = this.getNodes().find(
         (n) => n.label === identifier || n.id === identifier
       );
       if (node) {
@@ -200,7 +198,7 @@ export class ControlFlowVisitor
     const calleesOfUnusedNode: string[] = [];
     if (unusedNode && unusedNode.callees.length > 0) {
       unusedNode.callees.forEach((callee) => {
-        const calleeNode = this.nodes.find((n) => n.id === callee);
+        const calleeNode = this.getNodes().find((n) => n.id === callee);
         if (calleeNode && calleeNode.callers.length === 1) {
           calleesOfUnusedNode.push(calleeNode.id);
           calleesOfUnusedNode.push(...this.findCalleesOfUnusedNode(calleeNode));
@@ -220,7 +218,7 @@ export class ControlFlowVisitor
         return;
       }
 
-      const descendantNode = this.nodes.find((n) => n.id === descendant);
+      const descendantNode = this.getNodes().find((n) => n.id === descendant);
       if (descendantNode && descendantNode.type === NodeType.NORMAL) {
         hasNormalNode = true;
         return;
@@ -238,15 +236,15 @@ export class ControlFlowVisitor
     super.visitChildren(node);
 
     if (node.stop && node.stop.type === Token.EOF) {
-      const startNode = this.nodes.find((n) => n.type === NodeType.START);
+      const startNode = this.getNodes().find((n) => n.type === NodeType.START);
       if (!startNode) {
         throw new Error("Missing start or end node");
       }
 
       let unusedNodes: string[] = [];
-      this.nodes.forEach((child) => {
-        const callees = this.callerToCalleesMap.get(child.id);
-        const callers = this.calleeToCallersMap.get(
+      this.getNodes().forEach((child) => {
+        const callees = this.getCallerToCalleesMap().get(child.id);
+        const callers = this.getCalleeToCallersMap().get(
           child.type === NodeType.NORMAL ? child.label : child.id
         );
 
@@ -258,7 +256,7 @@ export class ControlFlowVisitor
         }
       });
 
-      this.nodes
+      this.getNodes()
         .filter(
           (n) => n.type === NodeType.CONDITION || n.type === NodeType.LOOP
         )
@@ -269,14 +267,14 @@ export class ControlFlowVisitor
         });
 
       [...unusedNodes].forEach((unusedNodeId) => {
-        const unusedNode = this.nodes.find((n) => n.id === unusedNodeId);
+        const unusedNode = this.getNodes().find((n) => n.id === unusedNodeId);
         if (unusedNode) {
           unusedNodes.push(...this.findCalleesOfUnusedNode(unusedNode));
         }
       });
 
-      this.nodes = this.nodes.filter(
-        (child) => !unusedNodes.includes(child.id)
+      this.setNodes(
+        this.getNodes().filter((child) => !unusedNodes.includes(child.id))
       );
     }
   }

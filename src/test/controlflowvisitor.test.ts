@@ -21,10 +21,11 @@ import {
   SimpleConditionContext,
   StatementContext,
 } from "../generated/VisualCobolParser";
-import { ControlFlowVisitor, Node, NodeType } from "../ControlFlowVisitor";
+import { ControlFlowVisitor } from "../ControlFlowVisitor";
 import { ParserRuleContext, Token } from "antlr4ts";
 import sinon from "sinon";
 import { TerminalNode } from "antlr4ts/tree/TerminalNode";
+import { NodeType, Node } from "../ControlFlowGraph";
 
 chai.use(sinonChai);
 const expect = chai.expect;
@@ -263,9 +264,9 @@ suite("Tests for Control Flow Visitor", () => {
 
     visitor.visitParagraph(stubCtx);
 
-    expect(visitor.nodes.length).to.equal(1);
+    expect(visitor.getNodes().length).to.equal(1);
 
-    const actual = visitor.nodes[0];
+    const actual = visitor.getNodes()[0];
     const expected = formNode(
       expectedStartLineNumber.toString(),
       expectedNodeName,
@@ -288,7 +289,7 @@ suite("Tests for Control Flow Visitor", () => {
 
     visitor.visitParagraph(stubCtx);
 
-    const actual = visitor.nodes[0];
+    const actual = visitor.getNodes()[0];
     const expected = formNode(
       expectedStartLineNumber.toString(),
       expectedNodeName,
@@ -337,11 +338,11 @@ suite("Tests for Control Flow Visitor", () => {
     visitor.visitPerformProcedureStatement(stubCtx);
 
     expect(
-      visitor.calleeToCallersMap.get(procedureName),
+      visitor.getCalleeToCallersMap().get(procedureName),
       "Callee To Callers Map"
     ).to.have.members([callerId]);
     expect(
-      visitor.callerToCalleesMap.get(callerId),
+      visitor.getCallerToCalleesMap().get(callerId),
       "Caller To Callees Map"
     ).to.have.members([procedureName]);
   });
@@ -384,11 +385,11 @@ suite("Tests for Control Flow Visitor", () => {
     visitor.visitPerformProcedureStatement(stubCtx);
 
     expect(
-      visitor.calleeToCallersMap.get(procedureName),
+      visitor.getCalleeToCallersMap().get(procedureName),
       "Callee To Callers Map"
     ).to.have.members([callerId]);
     expect(
-      visitor.callerToCalleesMap.get(callerId),
+      visitor.getCallerToCalleesMap().get(callerId),
       "Caller To Callees Map"
     ).to.have.members([procedureName]);
   });
@@ -420,15 +421,15 @@ suite("Tests for Control Flow Visitor", () => {
     visitor.visitPerformProcedureStatement(stubCtx2);
 
     expect(
-      visitor.callerToCalleesMap.get(callerId),
+      visitor.getCallerToCalleesMap().get(callerId),
       "Caller to Callees Map"
     ).to.have.members([procedureName1, procedureName2]);
     expect(
-      visitor.calleeToCallersMap.get(procedureName1),
+      visitor.getCalleeToCallersMap().get(procedureName1),
       "Callee to Caller Map - Procedure1"
     ).to.have.members([callerId]);
     expect(
-      visitor.calleeToCallersMap.get(procedureName2),
+      visitor.getCalleeToCallersMap().get(procedureName2),
       "Callee to Caller Map - Procedure2"
     ).to.have.members([callerId]);
   });
@@ -470,15 +471,15 @@ suite("Tests for Control Flow Visitor", () => {
     visitor.visitPerformProcedureStatement(stubCtx2);
 
     expect(
-      visitor.calleeToCallersMap.get(procedureName),
+      visitor.getCalleeToCallersMap().get(procedureName),
       "Callee to Callers Map"
     ).to.have.members([caller1ID, caller2ID]);
     expect(
-      visitor.callerToCalleesMap.get(caller1ID),
+      visitor.getCallerToCalleesMap().get(caller1ID),
       "Caller to Callees Map - Caller1"
     ).to.have.members([procedureName]);
     expect(
-      visitor.callerToCalleesMap.get(caller2ID),
+      visitor.getCallerToCalleesMap().get(caller2ID),
       "Caller to Callees Map - Caller2"
     ).to.have.members([procedureName]);
   });
@@ -523,7 +524,7 @@ suite("Tests for Control Flow Visitor", () => {
 
     visitor.visitIfStatement(stubCtx);
 
-    const actual = visitor.nodes[0];
+    const actual = visitor.getNodes()[0];
     const expected = formNode(
       expectedNodeId,
       expectedNodeName,
@@ -563,11 +564,11 @@ suite("Tests for Control Flow Visitor", () => {
     visitor.visitIfStatement(stubCtx);
 
     expect(
-      visitor.callerToCalleesMap.get(callerID),
+      visitor.getCallerToCalleesMap().get(callerID),
       "Caller to Callees Map"
     ).to.have.members([condtionNodeId]);
     expect(
-      visitor.calleeToCallersMap.get(condtionNodeId),
+      visitor.getCalleeToCallersMap().get(condtionNodeId),
       "Callee to Caller Map"
     ).to.have.members([callerID]);
   });
@@ -622,7 +623,7 @@ suite("Tests for Control Flow Visitor", () => {
 
     visitor.visitIfElse(stubIfElseCtx);
 
-    const actual = visitor.nodes[0];
+    const actual = visitor.getNodes()[0];
     const expected = formNode(
       expectedNodeId,
       expectedNodeName,
@@ -633,11 +634,11 @@ suite("Tests for Control Flow Visitor", () => {
 
     expect(actual).to.deep.equal(expected);
     expect(
-      visitor.callerToCalleesMap.get(conditionNodeId),
+      visitor.getCallerToCalleesMap().get(conditionNodeId),
       "Caller to Callees Map"
     ).to.contain.members([actual.id]);
     expect(
-      visitor.calleeToCallersMap.get(actual.id),
+      visitor.getCalleeToCallersMap().get(actual.id),
       "Callee to Callers Map"
     ).to.have.members([conditionNodeId]);
   });
@@ -696,7 +697,7 @@ suite("Tests for Control Flow Visitor", () => {
 
     visitor.visitPerformInlineStatement(stubPerformInlineStatementCtx);
 
-    const actual = visitor.nodes[0];
+    const actual = visitor.getNodes()[0];
     const expected = formNode(
       expectedNodeId,
       expectedNodeName,
@@ -706,12 +707,12 @@ suite("Tests for Control Flow Visitor", () => {
     );
 
     expect(actual).to.deep.equal(expected);
-    expect(visitor.callerToCalleesMap.get(callerID)).to.have.members([
+    expect(visitor.getCallerToCalleesMap().get(callerID)).to.have.members([
       expectedNodeId,
     ]);
-    expect(visitor.calleeToCallersMap.get(expectedNodeId)).to.have.members([
-      callerID,
-    ]);
+    expect(visitor.getCalleeToCallersMap().get(expectedNodeId)).to.have.members(
+      [callerID]
+    );
   });
 
   test("visitPerformInlineStatement call visitChildren once at the end", function () {
@@ -760,11 +761,15 @@ suite("Tests for Control Flow Visitor", () => {
       400
     );
 
-    visitor.callerToCalleesMap.set(startNode.id, [normalNode.label]);
-    visitor.calleeToCallersMap.set(normalNode.label, [startNode.id]);
-    visitor.callerToCalleesMap.set(normalNode.id, [normalNodeCallee.label]);
-    visitor.calleeToCallersMap.set(normalNodeCallee.label, [normalNode.id]);
-    visitor.nodes = [startNode, normalNode, normalNodeCallee];
+    visitor.getCallerToCalleesMap().set(startNode.id, [normalNode.label]);
+    visitor.getCalleeToCallersMap().set(normalNode.label, [startNode.id]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(normalNode.id, [normalNodeCallee.label]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(normalNodeCallee.label, [normalNode.id]);
+    visitor.setNodes([startNode, normalNode, normalNodeCallee]);
 
     const eof = createEOF();
     visitor.visitChildren(eof);
@@ -794,9 +799,9 @@ suite("Tests for Control Flow Visitor", () => {
       500
     );
 
-    visitor.calleeToCallersMap.set(normalNode.label, [startNode.id]);
-    visitor.callerToCalleesMap.set(startNode.id, [normalNode.label]);
-    visitor.nodes = [startNode, normalNode];
+    visitor.getCalleeToCallersMap().set(normalNode.label, [startNode.id]);
+    visitor.getCallerToCalleesMap().set(startNode.id, [normalNode.label]);
+    visitor.setNodes([startNode, normalNode]);
 
     const notEOF = sinon.createStubInstance(ParserRuleContext);
     visitor.visitChildren(notEOF);
@@ -817,14 +822,14 @@ suite("Tests for Control Flow Visitor", () => {
       500
     );
 
-    visitor.nodes = [startNode, normalNodeWithNoCaller];
+    visitor.setNodes([startNode, normalNodeWithNoCaller]);
 
     const eof = createEOF();
 
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 
   test("when visitChildren get EOF, the callees will be removed if its caller is removed", function () {
@@ -847,21 +852,21 @@ suite("Tests for Control Flow Visitor", () => {
       600
     );
 
-    visitor.callerToCalleesMap.set(normalNodeWithNoCaller.id, [
-      calleeNode.label,
-    ]);
-    visitor.calleeToCallersMap.set(calleeNode.label, [
-      normalNodeWithNoCaller.id,
-    ]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(normalNodeWithNoCaller.id, [calleeNode.label]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(calleeNode.label, [normalNodeWithNoCaller.id]);
 
-    visitor.nodes = [startNode, normalNodeWithNoCaller, calleeNode];
+    visitor.setNodes([startNode, normalNodeWithNoCaller, calleeNode]);
 
     const eof = createEOF();
 
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 
   test("when visitChildren get EOF, the descesdant callees will be removed RECURSIVELY if its ancestor caller is removed", function () {
@@ -897,18 +902,27 @@ suite("Tests for Control Flow Visitor", () => {
       500
     );
 
-    visitor.callerToCalleesMap.set(ancestorNode.id, [calleeNode.id]);
-    visitor.calleeToCallersMap.set(calleeNode.id, [ancestorNode.id]);
-    visitor.callerToCalleesMap.set(calleeNode.id, [calleeNodeDescendant.id]);
-    visitor.calleeToCallersMap.set(calleeNodeDescendant.id, [calleeNode.id]);
-    visitor.nodes = [startNode, ancestorNode, calleeNode, calleeNodeDescendant];
+    visitor.getCallerToCalleesMap().set(ancestorNode.id, [calleeNode.id]);
+    visitor.getCalleeToCallersMap().set(calleeNode.id, [ancestorNode.id]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(calleeNode.id, [calleeNodeDescendant.id]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(calleeNodeDescendant.id, [calleeNode.id]);
+    visitor.setNodes([
+      startNode,
+      ancestorNode,
+      calleeNode,
+      calleeNodeDescendant,
+    ]);
 
     const eof = createEOF();
 
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 
   test("when visitChildren get EOF, the condition node with no callee will be removed", function () {
@@ -922,16 +936,15 @@ suite("Tests for Control Flow Visitor", () => {
       500
     );
 
-    visitor.callerToCalleesMap.set(startNode.label, [conditionNode.id]);
-    visitor.calleeToCallersMap.set(conditionNode.id, [startNode.label]);
-
-    visitor.nodes = [startNode, conditionNode];
+    visitor.getCallerToCalleesMap().set(startNode.label, [conditionNode.id]);
+    visitor.getCalleeToCallersMap().set(conditionNode.id, [startNode.label]);
+    visitor.setNodes([startNode, conditionNode]);
 
     const eof = createEOF();
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 
   test("when visitChildren get EOF, the condition node will be removed when there's no descendant is a normal node", function () {
@@ -963,30 +976,35 @@ suite("Tests for Control Flow Visitor", () => {
 
     const elseNode = formNode("601", "ELSE", NodeType.CONDITION_ELSE, 601, 700);
 
-    visitor.callerToCalleesMap.set(startNode.label, [conditionNode.id]);
-    visitor.calleeToCallersMap.set(conditionNode.id, [startNode.label]);
-    visitor.callerToCalleesMap.set(conditionNode.id, [
-      nestedConditionNode.id,
-      elseNode.id,
-    ]);
-    visitor.calleeToCallersMap.set(nestedConditionNode.id, [conditionNode.id]);
-    visitor.calleeToCallersMap.set(elseNode.id, [conditionNode.id]);
-    visitor.callerToCalleesMap.set(nestedConditionNode.id, [nestedElseNode.id]);
-    visitor.calleeToCallersMap.set(nestedElseNode.id, [nestedConditionNode.id]);
+    visitor.getCallerToCalleesMap().set(startNode.label, [conditionNode.id]);
+    visitor.getCalleeToCallersMap().set(conditionNode.id, [startNode.label]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(conditionNode.id, [nestedConditionNode.id, elseNode.id]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(nestedConditionNode.id, [conditionNode.id]);
+    visitor.getCalleeToCallersMap().set(elseNode.id, [conditionNode.id]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(nestedConditionNode.id, [nestedElseNode.id]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(nestedElseNode.id, [nestedConditionNode.id]);
 
-    visitor.nodes = [
+    visitor.setNodes([
       startNode,
       conditionNode,
       nestedConditionNode,
       nestedElseNode,
       elseNode,
-    ];
+    ]);
 
     const eof = createEOF();
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 
   test("when visitChildren get EOF, the condition node will NOT be removed when there's a normal node as descendant", function () {
@@ -1017,34 +1035,35 @@ suite("Tests for Control Flow Visitor", () => {
       1000
     );
 
-    visitor.callerToCalleesMap.set(startNode.label, [conditionNode.id]);
-    visitor.calleeToCallersMap.set(conditionNode.id, [startNode.label]);
-    visitor.callerToCalleesMap.set(conditionNode.id, [
-      nestedConditionNode.id,
-      elseNode.id,
-    ]);
-    visitor.calleeToCallersMap.set(nestedConditionNode.id, [conditionNode.id]);
-    visitor.calleeToCallersMap.set(elseNode.id, [conditionNode.id]);
-    visitor.callerToCalleesMap.set(nestedConditionNode.id, [
-      normalNodeDescendant.label,
-    ]);
-    visitor.calleeToCallersMap.set(normalNodeDescendant.label, [
-      nestedConditionNode.id,
-    ]);
+    visitor.getCallerToCalleesMap().set(startNode.label, [conditionNode.id]);
+    visitor.getCalleeToCallersMap().set(conditionNode.id, [startNode.label]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(conditionNode.id, [nestedConditionNode.id, elseNode.id]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(nestedConditionNode.id, [conditionNode.id]);
+    visitor.getCalleeToCallersMap().set(elseNode.id, [conditionNode.id]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(nestedConditionNode.id, [normalNodeDescendant.label]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(normalNodeDescendant.label, [nestedConditionNode.id]);
 
-    visitor.nodes = [
+    visitor.setNodes([
       startNode,
       conditionNode,
       nestedConditionNode,
       normalNodeDescendant,
       elseNode,
-    ];
+    ]);
 
     const eof = createEOF();
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(5);
-    expect(visitor.nodes).to.have.members([
+    expect(visitor.getNodes().length).to.equal(5);
+    expect(visitor.getNodes()).to.have.members([
       startNode,
       conditionNode,
       nestedConditionNode,
@@ -1072,20 +1091,24 @@ suite("Tests for Control Flow Visitor", () => {
       600
     );
 
-    visitor.nodes = [startNode, conditionNodeWithNoCaller, conditionNodeCallee];
-    visitor.callerToCalleesMap.set(conditionNodeWithNoCaller.id, [
-      conditionNodeCallee.id,
+    visitor.setNodes([
+      startNode,
+      conditionNodeWithNoCaller,
+      conditionNodeCallee,
     ]);
-    visitor.calleeToCallersMap.set(conditionNodeCallee.id, [
-      conditionNodeWithNoCaller.id,
-    ]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(conditionNodeWithNoCaller.id, [conditionNodeCallee.id]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(conditionNodeCallee.id, [conditionNodeWithNoCaller.id]);
 
     const eof = createEOF();
 
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 
   test("when visitChildren get EOF, the loop node with no callee will be removed", function () {
@@ -1099,16 +1122,16 @@ suite("Tests for Control Flow Visitor", () => {
       500
     );
 
-    visitor.callerToCalleesMap.set(startNode.label, [loopNode.id]);
-    visitor.calleeToCallersMap.set(loopNode.id, [startNode.label]);
+    visitor.getCallerToCalleesMap().set(startNode.label, [loopNode.id]);
+    visitor.getCalleeToCallersMap().set(loopNode.id, [startNode.label]);
 
-    visitor.nodes = [startNode, loopNode];
+    visitor.setNodes([startNode, loopNode]);
 
     const eof = createEOF();
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 
   test("when visitChildren get EOF, the loop node will be removed when there's no descendant is a normal node", function () {
@@ -1138,20 +1161,29 @@ suite("Tests for Control Flow Visitor", () => {
       600
     );
 
-    visitor.callerToCalleesMap.set(startNode.label, [loopNode.id]);
-    visitor.calleeToCallersMap.set(loopNode.id, [startNode.label]);
-    visitor.callerToCalleesMap.set(loopNode.id, [nestedConditionNode.id]);
-    visitor.calleeToCallersMap.set(nestedConditionNode.id, [loopNode.id]);
-    visitor.callerToCalleesMap.set(nestedConditionNode.id, [nestedElseNode.id]);
-    visitor.calleeToCallersMap.set(nestedElseNode.id, [nestedConditionNode.id]);
+    visitor.getCallerToCalleesMap().set(startNode.label, [loopNode.id]);
+    visitor.getCalleeToCallersMap().set(loopNode.id, [startNode.label]);
+    visitor.getCallerToCalleesMap().set(loopNode.id, [nestedConditionNode.id]);
+    visitor.getCalleeToCallersMap().set(nestedConditionNode.id, [loopNode.id]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(nestedConditionNode.id, [nestedElseNode.id]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(nestedElseNode.id, [nestedConditionNode.id]);
 
-    visitor.nodes = [startNode, loopNode, nestedConditionNode, nestedElseNode];
+    visitor.setNodes([
+      startNode,
+      loopNode,
+      nestedConditionNode,
+      nestedElseNode,
+    ]);
 
     const eof = createEOF();
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 
   test("when visitChildren get EOF, the loop node will NOT be removed when there's a normal node as descendant", function () {
@@ -1181,29 +1213,29 @@ suite("Tests for Control Flow Visitor", () => {
       1000
     );
 
-    visitor.callerToCalleesMap.set(startNode.label, [loopNode.id]);
-    visitor.calleeToCallersMap.set(loopNode.id, [startNode.label]);
-    visitor.callerToCalleesMap.set(loopNode.id, [nestedConditionNode.id]);
-    visitor.calleeToCallersMap.set(nestedConditionNode.id, [loopNode.id]);
-    visitor.callerToCalleesMap.set(nestedConditionNode.id, [
-      normalNodeDescendant.label,
-    ]);
-    visitor.calleeToCallersMap.set(normalNodeDescendant.label, [
-      nestedConditionNode.id,
-    ]);
+    visitor.getCallerToCalleesMap().set(startNode.label, [loopNode.id]);
+    visitor.getCalleeToCallersMap().set(loopNode.id, [startNode.label]);
+    visitor.getCallerToCalleesMap().set(loopNode.id, [nestedConditionNode.id]);
+    visitor.getCalleeToCallersMap().set(nestedConditionNode.id, [loopNode.id]);
+    visitor
+      .getCallerToCalleesMap()
+      .set(nestedConditionNode.id, [normalNodeDescendant.label]);
+    visitor
+      .getCalleeToCallersMap()
+      .set(normalNodeDescendant.label, [nestedConditionNode.id]);
 
-    visitor.nodes = [
+    visitor.setNodes([
       startNode,
       loopNode,
       nestedConditionNode,
       normalNodeDescendant,
-    ];
+    ]);
 
     const eof = createEOF();
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(4);
-    expect(visitor.nodes).to.have.members([
+    expect(visitor.getNodes().length).to.equal(4);
+    expect(visitor.getNodes()).to.have.members([
       startNode,
       loopNode,
       nestedConditionNode,
@@ -1225,15 +1257,15 @@ suite("Tests for Control Flow Visitor", () => {
 
     const callee = formNode("501", "2000-PROCESS", NodeType.NORMAL, 501, 600);
 
-    visitor.nodes = [startNode, loopNodeWithNoCaller, callee];
-    visitor.callerToCalleesMap.set(loopNodeWithNoCaller.id, [callee.id]);
-    visitor.calleeToCallersMap.set(callee.id, [loopNodeWithNoCaller.id]);
+    visitor.setNodes([startNode, loopNodeWithNoCaller, callee]);
+    visitor.getCallerToCalleesMap().set(loopNodeWithNoCaller.id, [callee.id]);
+    visitor.getCalleeToCallersMap().set(callee.id, [loopNodeWithNoCaller.id]);
 
     const eof = createEOF();
 
     visitor.visitChildren(eof);
 
-    expect(visitor.nodes.length).to.equal(1);
-    expect(visitor.nodes).to.have.members([startNode]);
+    expect(visitor.getNodes().length).to.equal(1);
+    expect(visitor.getNodes()).to.have.members([startNode]);
   });
 });

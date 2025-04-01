@@ -82,6 +82,22 @@ export class ControlFlowVisitor
     };
   }
 
+  private getAncestor(ctx: ParserRuleContext): string {
+    let currentCtx: ParserRuleContext | undefined = ctx.parent;
+    while (
+      currentCtx &&
+      !(
+        currentCtx instanceof VisualCobolParser.ParagraphContext ||
+        currentCtx instanceof VisualCobolParser.IfStatementContext ||
+        currentCtx instanceof VisualCobolParser.PerformInlineStatementContext
+      )
+    ) {
+      currentCtx = currentCtx.parent as ParserRuleContext;
+    }
+
+    return currentCtx ? currentCtx.start.line.toString() : "";
+  }
+
   visitParagraph(ctx: VisualCobolParser.ParagraphContext): void {
     let node: Node = this.formNode(
       ctx.start.line.toString(),
@@ -208,44 +224,6 @@ export class ControlFlowVisitor
     return ids;
   }
 
-  private findCalleesOfUnusedNode(unusedNode: Node): string[] {
-    const calleesOfUnusedNode: string[] = [];
-    if (unusedNode && unusedNode.callees.length > 0) {
-      unusedNode.callees.forEach((callee) => {
-        const calleeNode = this.getNodes().find((n) => n.id === callee);
-        if (calleeNode && calleeNode.callers.length === 1) {
-          calleesOfUnusedNode.push(calleeNode.id);
-          calleesOfUnusedNode.push(...this.findCalleesOfUnusedNode(calleeNode));
-        }
-      });
-    }
-
-    return calleesOfUnusedNode;
-  }
-
-  private hasNormalNodeAsDescendants(parent: Node): boolean {
-    const currentDescendants: string[] = parent.callees;
-    let hasNormalNode = false;
-
-    currentDescendants.forEach((descendant) => {
-      if (hasNormalNode) {
-        return;
-      }
-
-      const descendantNode = this.getNodes().find((n) => n.id === descendant);
-      if (descendantNode && descendantNode.type === NodeType.NORMAL) {
-        hasNormalNode = true;
-        return;
-      }
-
-      if (descendantNode && descendantNode.callees.length > 0) {
-        hasNormalNode = this.hasNormalNodeAsDescendants(descendantNode);
-      }
-    });
-
-    return hasNormalNode;
-  }
-
   visitChildren(node: ParserRuleContext) {
     super.visitChildren(node);
 
@@ -255,7 +233,6 @@ export class ControlFlowVisitor
         throw new Error("Missing start or end node");
       }
 
-      let unusedNodes: string[] = [];
       this.getNodes().forEach((child) => {
         const callees = this.getCallerToCalleesMap().get(child.id);
         const callers = this.getCalleeToCallersMap().get(
@@ -264,46 +241,7 @@ export class ControlFlowVisitor
 
         child.callees = callees ? this.getIdFor(callees) : [];
         child.callers = callers ? callers : [];
-
-        if (child.type !== NodeType.START && child.callers.length === 0) {
-          unusedNodes.push(child.id);
-        }
       });
-
-      this.getNodes()
-        .filter(
-          (n) => n.type === NodeType.CONDITION || n.type === NodeType.LOOP
-        )
-        .forEach((n) => {
-          if (n.callees.length === 0 || !this.hasNormalNodeAsDescendants(n)) {
-            unusedNodes.push(n.id);
-          }
-        });
-
-      [...unusedNodes].forEach((unusedNodeId) => {
-        const unusedNode = this.getNodes().find((n) => n.id === unusedNodeId);
-        if (unusedNode) {
-          unusedNodes.push(...this.findCalleesOfUnusedNode(unusedNode));
-        }
-      });
-
-      this.removeNodes(unusedNodes);
     }
-  }
-
-  private getAncestor(ctx: ParserRuleContext): string {
-    let currentCtx: ParserRuleContext | undefined = ctx.parent;
-    while (
-      currentCtx &&
-      !(
-        currentCtx instanceof VisualCobolParser.ParagraphContext ||
-        currentCtx instanceof VisualCobolParser.IfStatementContext ||
-        currentCtx instanceof VisualCobolParser.PerformInlineStatementContext
-      )
-    ) {
-      currentCtx = currentCtx.parent as ParserRuleContext;
-    }
-
-    return currentCtx ? currentCtx.start.line.toString() : "";
   }
 }

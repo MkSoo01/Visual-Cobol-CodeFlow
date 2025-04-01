@@ -1,7 +1,8 @@
 const chai = require("chai");
 const sinonChai = require("sinon-chai");
-import { ControlFlowGraph, Edge } from "../ControlFlowGraph";
-import { Node, NodeType } from "../ControlFlowVisitor";
+import { start } from "repl";
+import { ControlFlowGraph, Node, NodeType } from "../ControlFlowGraph";
+import exp from "constants";
 
 chai.use(sinonChai);
 const expect = chai.expect;
@@ -36,6 +37,13 @@ suite("Tests for Control Flow Graph", () => {
     callee.callers.push(caller.id);
   }
 
+  function setCallerCalleeAfterReset(caller: Node, callee: Node) {
+    caller.callees = [];
+    callee.callers = [];
+    caller.callees.push(callee.id);
+    callee.callers.push(caller.id);
+  }
+
   test("the normal node with no caller will be removed", function () {
     const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
     const normalNodeLabelWithNoCaller = "1000-INIT";
@@ -48,12 +56,12 @@ suite("Tests for Control Flow Graph", () => {
       500
     );
 
-    cfg.addNodes([startNode, normalNodeWithNoCaller]);
+    cfg.addRawNodes([startNode, normalNodeWithNoCaller]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
   test("the callees will be removed if its caller is removed", function () {
@@ -78,12 +86,12 @@ suite("Tests for Control Flow Graph", () => {
 
     setCallerCallee(normalNodeWithNoCaller, calleeNode);
 
-    cfg.addNodes([startNode, normalNodeWithNoCaller, calleeNode]);
+    cfg.addRawNodes([startNode, normalNodeWithNoCaller, calleeNode]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
   test("the descesdant callees will be removed RECURSIVELY if its ancestor caller is removed", function () {
@@ -121,12 +129,17 @@ suite("Tests for Control Flow Graph", () => {
 
     setCallerCallee(ancestorNode, calleeNode);
     setCallerCallee(calleeNode, calleeNodeDescendant);
-    cfg.addNodes([startNode, ancestorNode, calleeNode, calleeNodeDescendant]);
+    cfg.addRawNodes([
+      startNode,
+      ancestorNode,
+      calleeNode,
+      calleeNodeDescendant,
+    ]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
   test("the condition node with no callee will be removed", function () {
@@ -141,12 +154,12 @@ suite("Tests for Control Flow Graph", () => {
     );
 
     setCallerCallee(startNode, conditionNode);
-    cfg.addNodes([startNode, conditionNode]);
+    cfg.addRawNodes([startNode, conditionNode]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
   test("the condition node will be removed when there's no descendant is a normal node", function () {
@@ -183,7 +196,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(conditionNode, elseNode);
     setCallerCallee(nestedConditionNode, nestedElseNode);
 
-    cfg.addNodes([
+    cfg.addRawNodes([
       startNode,
       conditionNode,
       nestedConditionNode,
@@ -191,10 +204,10 @@ suite("Tests for Control Flow Graph", () => {
       elseNode,
     ]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
   test("the condition node will NOT be removed when there's a normal node as descendant", function () {
@@ -230,7 +243,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(conditionNode, elseNode);
     setCallerCallee(nestedConditionNode, normalNodeDescendant);
 
-    cfg.addNodes([
+    cfg.addRawNodes([
       startNode,
       conditionNode,
       nestedConditionNode,
@@ -238,10 +251,10 @@ suite("Tests for Control Flow Graph", () => {
       elseNode,
     ]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(5);
-    expect(cfg.getDisplayNodes()).to.have.members([
+    expect(cfg.getRawNodes().length).to.equal(5);
+    expect(cfg.getRawNodes()).to.be.deep.equal([
       startNode,
       conditionNode,
       nestedConditionNode,
@@ -269,13 +282,17 @@ suite("Tests for Control Flow Graph", () => {
       600
     );
 
-    cfg.addNodes([startNode, conditionNodeWithNoCaller, conditionNodeCallee]);
+    cfg.addRawNodes([
+      startNode,
+      conditionNodeWithNoCaller,
+      conditionNodeCallee,
+    ]);
     setCallerCallee(conditionNodeWithNoCaller, conditionNodeCallee);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
   test("the loop node with no callee will be removed", function () {
@@ -290,12 +307,12 @@ suite("Tests for Control Flow Graph", () => {
     );
 
     setCallerCallee(startNode, loopNode);
-    cfg.addNodes([startNode, loopNode]);
+    cfg.addRawNodes([startNode, loopNode]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
   test("the loop node will be removed when there's no descendant is a normal node", function () {
@@ -329,12 +346,12 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(loopNode, nestedConditionNode);
     setCallerCallee(nestedConditionNode, nestedElseNode);
 
-    cfg.addNodes([startNode, loopNode, nestedConditionNode, nestedElseNode]);
+    cfg.addRawNodes([startNode, loopNode, nestedConditionNode, nestedElseNode]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
   test("the loop node will NOT be removed when there's a normal node as descendant", function () {
@@ -368,17 +385,17 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(loopNode, nestedConditionNode);
     setCallerCallee(nestedConditionNode, normalNodeDescendant);
 
-    cfg.addNodes([
+    cfg.addRawNodes([
       startNode,
       loopNode,
       nestedConditionNode,
       normalNodeDescendant,
     ]);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(4);
-    expect(cfg.getDisplayNodes()).to.have.members([
+    expect(cfg.getRawNodes().length).to.equal(4);
+    expect(cfg.getRawNodes()).to.be.deep.equal([
       startNode,
       loopNode,
       nestedConditionNode,
@@ -400,407 +417,242 @@ suite("Tests for Control Flow Graph", () => {
 
     const callee = formNode("501", "2000-PROCESS", NodeType.NORMAL, 501, 600);
 
-    cfg.addNodes([startNode, loopNodeWithNoCaller, callee]);
+    cfg.addRawNodes([startNode, loopNodeWithNoCaller, callee]);
     setCallerCallee(loopNodeWithNoCaller, callee);
 
-    cfg.processNodesForDisplay();
+    cfg.generateDisplayNodes();
 
-    expect(cfg.getDisplayNodes().length).to.equal(1);
-    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+    expect(cfg.getRawNodes().length).to.equal(1);
+    expect(cfg.getRawNodes()).to.be.deep.equal([startNode]);
   });
 
-  test("display nodes generated correctly for simple with one normal node, start node and end node", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
+  test("display nodes generated correctly for simple with one start node and normal node", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const normalNode = formNode("400", "1000-INIT", NodeType.NORMAL, 400, 500);
 
-    const normalNodeLabel = "1000-INIT";
+    setCallerCallee(startNode, normalNode);
+    cfg.addRawNodes([startNode, normalNode]);
 
-    const normalNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 500,
-      endLineNumber: 600,
-      label: normalNodeLabel,
-      type: NodeType.NORMAL,
-    };
-
-    normalNode.callers.push(startNode.id);
-    startNode.callees = [normalNode.id, endNode.id];
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [startNode, normalNode, endNode];
-
-    const expectedStartNode = getStartNode();
-    const expectedNormalNode: Node = structuredClone(normalNode);
-    const expectedEndNode = getEndNode();
+    const expectedStartNode = structuredClone(startNode);
+    const expectedNormalNode = structuredClone(normalNode);
     expectedStartNode.callees = [expectedNormalNode.id];
     expectedNormalNode.callers = [expectedStartNode.id];
-    expectedNormalNode.callees = [expectedEndNode.id];
-    expectedEndNode.callers = [expectedNormalNode.id];
 
-    cfg.createDisplayNodes();
+    cfg.generateDisplayNodes();
 
-    const actualStartNode = cfg.displayNodes[0];
-    const actualNormalNode = cfg.displayNodes[1];
-    const actualEndNode = cfg.displayNodes[2];
-
-    expect(actualStartNode).to.deep.equal(expectedStartNode);
-    expect(actualNormalNode).to.deep.equal(expectedNormalNode);
-    expect(actualEndNode).to.deep.equal(expectedEndNode);
-  });
-
-  test("display nodes generated correctly without changing the visitor nodes", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
-
-    const normalNodeLabel = "1000-INIT";
-
-    const normalNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 500,
-      endLineNumber: 600,
-      label: normalNodeLabel,
-      type: NodeType.NORMAL,
-    };
-
-    normalNode.callers.push(startNode.id);
-    startNode.callees = [normalNode.id, endNode.id];
-    endNode.callers.push(startNode.id);
-    const originalVisitorNodes = [startNode, normalNode, endNode];
-    cfg.nodes = structuredClone(originalVisitorNodes);
-
-    const expectedStartNode = getStartNode();
-    const expectedNormalNode: Node = structuredClone(normalNode);
-    const expectedEndNode = getEndNode();
-    expectedStartNode.callees = [expectedNormalNode.id];
-    expectedNormalNode.callers = [expectedStartNode.id];
-    expectedNormalNode.callees = [expectedEndNode.id];
-    expectedEndNode.callers = [expectedNormalNode.id];
-
-    cfg.createDisplayNodes();
-
-    const actualStartNode = cfg.displayNodes[0];
-    const actualNormalNode = cfg.displayNodes[1];
-    const actualEndNode = cfg.displayNodes[2];
-
-    expect(actualStartNode).to.deep.equal(expectedStartNode);
-    expect(actualNormalNode).to.deep.equal(expectedNormalNode);
-    expect(actualEndNode).to.deep.equal(expectedEndNode);
-    expect(cfg.nodes).to.deep.equal(originalVisitorNodes);
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
+      expectedNormalNode,
+    ]);
   });
 
   test("error thrown for callee not found when generate Display Nodes", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const normalNode = formNode("400", "1000-INIT", NodeType.NORMAL, 400, 500);
     const non_existing_callee = "non-existing-callee";
-    const normalNodeLabel = "1000-INIT";
-    const normalNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 500,
-      endLineNumber: 600,
-      label: normalNodeLabel,
-      type: NodeType.NORMAL,
-    };
 
-    normalNode.callers.push(startNode.id);
-    startNode.callees.push(normalNode.id);
-    startNode.callees.push(non_existing_callee);
-    startNode.callees.push(endNode.id);
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [startNode, normalNode, endNode];
+    setCallerCallee(startNode, normalNode);
+    normalNode.callees.push(non_existing_callee);
+    cfg.addRawNodes([startNode, normalNode]);
 
-    expect(() => cfg.createDisplayNodes()).throws(
+    expect(() => cfg.generateDisplayNodes()).throws(
       "Callee " + non_existing_callee + " not found"
     );
   });
 
   test("display nodes generated correctly for node with multiple callers but no callee", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
 
-    const callerNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 500,
-      endLineNumber: 600,
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-    };
+    const callerNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400);
 
-    const nodeWithMultipleCallers: Node = {
-      id: "700",
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 750,
-      label: "2000-PROCESS",
-      type: NodeType.NORMAL,
-    };
+    const nodeWithMultipleCallers = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
 
     nodeWithMultipleCallers.callers = [startNode.id, callerNode.id];
-    callerNode.callers.push(startNode.id);
-    callerNode.callees.push(nodeWithMultipleCallers.id);
-    startNode.callees = [nodeWithMultipleCallers.id, callerNode.id, endNode.id];
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [startNode, callerNode, nodeWithMultipleCallers, endNode];
+    setCallerCallee(startNode, nodeWithMultipleCallers);
+    setCallerCallee(startNode, callerNode);
+    setCallerCallee(callerNode, nodeWithMultipleCallers);
 
-    cfg.createDisplayNodes();
+    cfg.addRawNodes([startNode, callerNode, nodeWithMultipleCallers]);
 
-    const expectedDisplayNodeId_1 = nodeWithMultipleCallers.id + "_1";
+    cfg.generateDisplayNodes();
+
+    const expectedStartNode = structuredClone(startNode);
+    const expectedCallerNode = structuredClone(callerNode);
     const expectedDisplayNode_1 = structuredClone(nodeWithMultipleCallers);
-    expectedDisplayNode_1.id = expectedDisplayNodeId_1;
-    expectedDisplayNode_1.callers = [startNode.id];
-    expectedDisplayNode_1.callees = [callerNode.id];
-
-    const expectedDisplayNodeId_2 = nodeWithMultipleCallers.id + "_2";
+    expectedDisplayNode_1.id = nodeWithMultipleCallers.id + "_1";
     const expectedDisplayNode_2 = structuredClone(nodeWithMultipleCallers);
-    expectedDisplayNode_2.id = expectedDisplayNodeId_2;
-    expectedDisplayNode_2.callers = [callerNode.id];
-    expectedDisplayNode_2.callees = [endNode.id];
+    expectedDisplayNode_2.id = nodeWithMultipleCallers.id + "_2";
 
-    const actualStartNode = cfg.displayNodes.find((n) => n.id === startNode.id);
-    const actualCallerNode = cfg.displayNodes.find(
-      (n) => n.id === callerNode.id
-    );
-    const actualEndNode = cfg.displayNodes.find((n) => n.id === endNode.id);
+    setCallerCalleeAfterReset(expectedStartNode, expectedDisplayNode_1);
+    setCallerCalleeAfterReset(expectedDisplayNode_1, expectedCallerNode);
+    setCallerCalleeAfterReset(expectedCallerNode, expectedDisplayNode_2);
 
-    expect(cfg.displayNodes).to.contain.deep.members([
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
       expectedDisplayNode_1,
+      expectedCallerNode,
       expectedDisplayNode_2,
-    ]);
-    expect(actualStartNode!.callees).to.have.members([
-      expectedDisplayNode_1.id,
-    ]);
-    expect(actualCallerNode!.callers).to.have.members([
-      expectedDisplayNode_1.id,
-    ]);
-    expect(actualCallerNode!.callees).to.have.members([
-      expectedDisplayNode_2.id,
-    ]);
-    expect(actualEndNode!.callers).to.have.members([expectedDisplayNode_2.id]);
-    // assert that the original visitor nodes did not get modified.
-    expect(cfg.nodes).to.have.members([
-      startNode,
-      callerNode,
-      nodeWithMultipleCallers,
-      endNode,
     ]);
   });
 
   test("display nodes generated correctly for node that calling itself", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const testNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400);
+    const calleeNode = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
 
-    const testNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 500,
-      endLineNumber: 600,
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-    };
+    setCallerCallee(startNode, testNode);
+    setCallerCallee(testNode, testNode);
+    setCallerCallee(testNode, calleeNode);
+    cfg.addRawNodes([startNode, testNode, calleeNode]);
 
-    testNode.callers = [startNode.id, testNode.id];
-    testNode.callees = [testNode.id];
-    startNode.callees = [testNode.id, endNode.id];
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [startNode, testNode, endNode];
+    cfg.generateDisplayNodes();
 
-    cfg.createDisplayNodes();
-
-    const expectedDisplayNodeId_1 = testNode.id + "_1";
+    const expectedStartNode = structuredClone(startNode);
     const expectedDisplayNode_1 = structuredClone(testNode);
-    expectedDisplayNode_1.id = expectedDisplayNodeId_1;
-    expectedDisplayNode_1.callers = [startNode.id];
-
-    const expectedDisplayNodeId_2 = testNode.id + "_2";
+    expectedDisplayNode_1.id = testNode.id + "_1";
     const expectedDisplayNode_2 = structuredClone(testNode);
-    expectedDisplayNode_2.id = expectedDisplayNodeId_2;
-    expectedDisplayNode_2.callers = [expectedDisplayNode_1.id];
-    expectedDisplayNode_2.callees = [endNode.id];
-    expectedDisplayNode_1.callees = [expectedDisplayNode_2.id];
+    expectedDisplayNode_2.id = testNode.id + "_2";
+    const expectedCalleeNode = structuredClone(calleeNode);
+    expectedCalleeNode.id = calleeNode.id + "_1";
 
-    const actualStartNode = cfg.displayNodes.find((n) => n.id === startNode.id);
-    const actualEndNode = cfg.displayNodes.find((n) => n.id === endNode.id);
+    setCallerCalleeAfterReset(expectedStartNode, expectedDisplayNode_1);
+    setCallerCalleeAfterReset(expectedDisplayNode_1, expectedDisplayNode_2);
+    setCallerCalleeAfterReset(expectedDisplayNode_2, expectedCalleeNode);
 
-    expect(cfg.displayNodes).to.contain.deep.members([
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
       expectedDisplayNode_1,
       expectedDisplayNode_2,
+      expectedCalleeNode,
     ]);
-    expect(actualStartNode!.callees).to.have.members([
-      expectedDisplayNode_1.id,
+
+    // assert that the original raw nodes did not get modified.
+    expect(cfg.getRawNodes(), "raw nodes").to.be.deep.equal([
+      startNode,
+      testNode,
+      calleeNode,
     ]);
-    expect(actualEndNode!.callers).to.have.members([expectedDisplayNode_2.id]);
-    // assert that the original visitor nodes did not get modified.
-    expect(cfg.nodes).to.have.members([startNode, testNode, endNode]);
   });
 
-  test("display nodes generated correctly for node with multiple callers and callees", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
-
-    const callerNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 500,
-      endLineNumber: 600,
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    const nodeWithMultipleCallers: Node = {
-      id: "700",
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 750,
-      label: "2000-PROCESS",
-      type: NodeType.NORMAL,
-    };
-
-    const calleeNode: Node = {
-      id: "800",
-      callers: [],
-      callees: [],
-      startLineNumber: 800,
-      endLineNumber: 850,
-      label: "3000-PROCESS_DATA",
-      type: NodeType.NORMAL,
-    };
-
-    calleeNode.callers.push(nodeWithMultipleCallers.id);
-    nodeWithMultipleCallers.callers = [startNode.id, callerNode.id];
-    nodeWithMultipleCallers.callees.push(calleeNode.id);
-    callerNode.callers.push(startNode.id);
-    callerNode.callees.push(nodeWithMultipleCallers.id);
-    startNode.callees = [nodeWithMultipleCallers.id, callerNode.id, endNode.id];
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [
-      startNode,
-      callerNode,
-      nodeWithMultipleCallers,
-      calleeNode,
-      endNode,
-    ];
-
-    cfg.createDisplayNodes();
-
-    const expectedDisplayNodeId_1 = nodeWithMultipleCallers.id + "_1";
-    const expectedDisplayNode_1 = structuredClone(nodeWithMultipleCallers);
-    expectedDisplayNode_1.id = expectedDisplayNodeId_1;
-    expectedDisplayNode_1.callers = [startNode.id];
-
-    const expectedDisplayNodeId_2 = nodeWithMultipleCallers.id + "_2";
-    const expectedDisplayNode_2 = structuredClone(nodeWithMultipleCallers);
-    expectedDisplayNode_2.id = expectedDisplayNodeId_2;
-    expectedDisplayNode_2.callers = [callerNode.id];
-
-    const expectedCalleeNodeId_1 = calleeNode.id + "_1";
-    const expectedCalleeNode_1 = structuredClone(calleeNode);
-    expectedCalleeNode_1.id = expectedCalleeNodeId_1;
-    expectedCalleeNode_1.callers = [expectedDisplayNode_1.id];
-    expectedCalleeNode_1.callees = [callerNode.id];
-    expectedDisplayNode_1.callees = [expectedCalleeNode_1.id];
-
-    const expectedCalleeNodeId_2 = calleeNode.id + "_2";
-    const expectedCalleeNode_2 = structuredClone(calleeNode);
-    expectedCalleeNode_2.id = expectedCalleeNodeId_2;
-    expectedCalleeNode_2.callers = [expectedDisplayNode_2.id];
-    expectedCalleeNode_2.callees = [endNode.id];
-    expectedDisplayNode_2.callees = [expectedCalleeNode_2.id];
-
-    const actualStartNode = cfg.displayNodes.find((n) => n.id === startNode.id);
-    const actualCallerNode = cfg.displayNodes.find(
-      (n) => n.id === callerNode.id
+  test("display nodes generated correctly for node with multiple callers and has callee", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const callerNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400);
+    const nodeWithMultipleCallers = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
     );
-    const actualEndNode = cfg.displayNodes.find((n) => n.id === endNode.id);
+    const calleeNode = formNode(
+      "700",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      700,
+      800
+    );
 
-    expect(cfg.displayNodes).to.contain.deep.members([
-      expectedDisplayNode_1,
-      expectedDisplayNode_2,
-      expectedCalleeNode_1,
-      expectedCalleeNode_2,
-    ]);
-    expect(actualStartNode!.callees).to.have.members([
-      expectedDisplayNode_1.id,
-    ]);
-    expect(actualCallerNode!.callers).to.have.members([
-      expectedCalleeNode_1.id,
-    ]);
-    expect(actualCallerNode!.callees).to.have.members([
-      expectedDisplayNode_2.id,
-    ]);
-    expect(actualEndNode!.callers).to.have.members([expectedCalleeNode_2.id]);
-    // assert that the original visitor nodes did not get modified.
-    expect(cfg.nodes).to.have.members([
+    setCallerCallee(startNode, nodeWithMultipleCallers);
+    setCallerCallee(startNode, callerNode);
+    setCallerCallee(callerNode, nodeWithMultipleCallers);
+    setCallerCallee(nodeWithMultipleCallers, calleeNode);
+    cfg.addRawNodes([
       startNode,
       callerNode,
       nodeWithMultipleCallers,
       calleeNode,
-      endNode,
+    ]);
+
+    cfg.generateDisplayNodes();
+
+    const expectedStartNode = structuredClone(startNode);
+    const expectedCallerNode = structuredClone(callerNode);
+    const expectedDisplayNode_1 = structuredClone(nodeWithMultipleCallers);
+    expectedDisplayNode_1.id = nodeWithMultipleCallers.id + "_1";
+    const expectedDisplayNode_2 = structuredClone(nodeWithMultipleCallers);
+    expectedDisplayNode_2.id = nodeWithMultipleCallers.id + "_2";
+    const expectedCalleeNode_1 = structuredClone(calleeNode);
+    expectedCalleeNode_1.id = calleeNode.id + "_1";
+    const expectedCalleeNode_2 = structuredClone(calleeNode);
+    expectedCalleeNode_2.id = calleeNode.id + "_2";
+
+    setCallerCalleeAfterReset(expectedStartNode, expectedDisplayNode_1);
+    setCallerCalleeAfterReset(expectedDisplayNode_1, expectedCalleeNode_1);
+    setCallerCalleeAfterReset(expectedCalleeNode_1, expectedCallerNode);
+    setCallerCalleeAfterReset(expectedCallerNode, expectedDisplayNode_2);
+    setCallerCalleeAfterReset(expectedDisplayNode_2, expectedCalleeNode_2);
+
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
+      expectedDisplayNode_1,
+      expectedCalleeNode_1,
+      expectedCallerNode,
+      expectedDisplayNode_2,
+      expectedCalleeNode_2,
     ]);
   });
 
   test("display nodes generated correctly for IF", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const conditionNode = formNode(
+      "200",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      200,
+      300
+    );
+    const conditonNodeCallee = formNode(
+      "400",
+      "1000-INIT",
+      NodeType.NORMAL,
+      400,
+      500
+    );
+    const normalNode = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
 
-    const normalNode: Node = {
-      id: "700",
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 800,
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-    };
+    setCallerCallee(startNode, conditionNode);
+    setCallerCallee(startNode, normalNode);
+    setCallerCallee(conditionNode, conditonNodeCallee);
+    cfg.addRawNodes([startNode, conditionNode, conditonNodeCallee, normalNode]);
 
-    const conditionNodeLabel = "IF OFFICIAL-RATE EQUALS ZEROES";
-    const conditionNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 400,
-      endLineNumber: 850,
-      label: conditionNodeLabel,
-      type: NodeType.CONDITION,
-    };
+    const expectedStartNode = structuredClone(startNode);
+    const expectedConditionNode = structuredClone(conditionNode);
+    const expectedConditionNodeCallee = structuredClone(conditonNodeCallee);
+    const expectedNormalNode = structuredClone(normalNode);
+    setCallerCalleeAfterReset(expectedStartNode, expectedConditionNode);
+    setCallerCalleeAfterReset(
+      expectedConditionNode,
+      expectedConditionNodeCallee
+    );
+    setCallerCalleeAfterReset(expectedConditionNodeCallee, expectedNormalNode);
+    setCallerCallee(expectedConditionNode, expectedNormalNode);
 
-    conditionNode.callers.push(startNode.id);
-    normalNode.callers.push(startNode.id);
-    startNode.callees = [conditionNode.id, normalNode.id, endNode.id];
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [startNode, conditionNode, normalNode, endNode];
+    cfg.generateDisplayNodes();
 
-    const expectedStartNode = getStartNode();
-    const expectedConditionNode: Node = structuredClone(conditionNode);
-    const expectedNormalNode: Node = structuredClone(normalNode);
-    const expectedEndNode = getEndNode();
-    expectedStartNode.callees = [expectedConditionNode.id];
-    expectedConditionNode.callers = [expectedStartNode.id];
-    expectedConditionNode.callees = [expectedNormalNode.id];
-    expectedNormalNode.callers = [expectedConditionNode.id];
-    expectedNormalNode.callees = [expectedEndNode.id];
-    expectedEndNode.callers = [expectedNormalNode.id];
-
-    cfg.createDisplayNodes();
-
-    const actualStartNode = cfg.displayNodes[0];
-    const actualConditionNode = cfg.displayNodes[1];
-    const actualNormalNode = cfg.displayNodes[2];
-    const actualEndNode = cfg.displayNodes[3];
-
-    expect(actualStartNode).to.deep.equal(expectedStartNode);
-    expect(actualConditionNode).to.deep.equal(expectedConditionNode);
-    expect(actualNormalNode).to.deep.equal(expectedNormalNode);
-    expect(actualEndNode).to.deep.equal(expectedEndNode);
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
+      expectedConditionNode,
+      expectedConditionNodeCallee,
+      expectedNormalNode,
+    ]);
   });
 
   // TODO: take out the logic for condition to another function
@@ -811,109 +663,147 @@ suite("Tests for Control Flow Graph", () => {
   // check there's any else node in between if and endif node, if none then
   // push the condition node as caller for the callee of endif node and vice versa,
   // remove the end if node afterwards
-  // scenario 1: if have normal node, no else
-  // scenario 2: if have normal node, have else, no normal node
-  // scenario 3: if have normal node, have else, have normal node
+  // --scenario 1: if have normal node, no else
+  // --scenario 2: if have normal node, have else, no normal node
+  // --scenario 3: if have normal node, have else, have normal node
   // scenario 4: if don't have normal node, no else
   // scenario 5: if don't have normal node, have else, no normal node
   // scenario 6: if don't have normal node, have else, have normal node
 
-  test("display nodes generated correctly for IF-ELSE", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
+  test("display nodes generated correctly for IF-ELSE but no callees after elseNode", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const conditionNode = formNode(
+      "200",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      200,
+      300
+    );
+    const conditonNodeCallee = formNode(
+      "400",
+      "1000-INIT",
+      NodeType.NORMAL,
+      400,
+      500
+    );
+    const normalNode = formNode(
+      "501",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      501,
+      600
+    );
+    const elseNode = formNode("450", "ELSE", NodeType.CONDITION_ELSE, 450, 500);
 
-    const conditionNodeLabel = "IF OFFICIAL-RATE EQUALS ZEROES";
-    const conditionNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 400,
-      endLineNumber: 850,
-      label: conditionNodeLabel,
-      type: NodeType.CONDITION,
-    };
-
-    const ifTrueNode: Node = {
-      id: "500",
-      callers: [],
-      callees: [],
-      startLineNumber: 500,
-      endLineNumber: 600,
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    const elseNode: Node = {
-      id: "601",
-      callers: [],
-      callees: [],
-      startLineNumber: 601,
-      endLineNumber: 800,
-      label: "ELSE",
-      type: NodeType.CONDITION_ELSE,
-    };
-
-    const ifFalseNode: Node = {
-      id: "700",
-      callers: [],
-      callees: [],
-      startLineNumber: 700,
-      endLineNumber: 800,
-      label: "2000-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    conditionNode.callers.push(startNode.id);
-    ifTrueNode.callers.push(startNode.id);
-    elseNode.callers.push(startNode.id);
-    ifFalseNode.callers.push(startNode.id);
-    startNode.callees = [
-      conditionNode.id,
-      ifTrueNode.id,
-      elseNode.id,
-      ifFalseNode.id,
-      endNode.id,
-    ];
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [
+    setCallerCallee(startNode, conditionNode);
+    setCallerCallee(startNode, normalNode);
+    setCallerCallee(conditionNode, conditonNodeCallee);
+    setCallerCallee(conditionNode, elseNode);
+    cfg.addRawNodes([
       startNode,
       conditionNode,
-      ifTrueNode,
+      conditonNodeCallee,
       elseNode,
-      ifFalseNode,
-      endNode,
-    ];
+      normalNode,
+    ]);
 
-    const expectedStartNode = getStartNode();
-    const expectedConditionNode: Node = structuredClone(conditionNode);
-    const expectedIfTrueNode: Node = structuredClone(ifTrueNode);
-    const expectedIfFalseNode: Node = structuredClone(ifFalseNode);
-    const expectedEndNode = getEndNode();
-    expectedStartNode.callees = [expectedConditionNode.id];
-    expectedConditionNode.callers = [expectedStartNode.id];
-    expectedConditionNode.callees = [
-      expectedIfTrueNode.id,
-      expectedIfFalseNode.id,
-    ];
-    expectedIfTrueNode.callers = [expectedConditionNode.id];
-    expectedIfTrueNode.callees = [expectedEndNode.id];
-    expectedIfFalseNode.callers = [expectedConditionNode.id];
-    expectedIfFalseNode.callees = [expectedEndNode.id];
-    expectedEndNode.callers = [expectedIfTrueNode.id, expectedIfFalseNode.id];
+    const expectedStartNode = structuredClone(startNode);
+    const expectedConditionNode = structuredClone(conditionNode);
+    const expectedConditionNodeCallee = structuredClone(conditonNodeCallee);
+    const expectedNormalNode = structuredClone(normalNode);
+    setCallerCalleeAfterReset(expectedStartNode, expectedConditionNode);
+    setCallerCalleeAfterReset(
+      expectedConditionNode,
+      expectedConditionNodeCallee
+    );
+    setCallerCalleeAfterReset(expectedConditionNodeCallee, expectedNormalNode);
+    setCallerCallee(expectedConditionNode, expectedNormalNode);
 
-    cfg.createDisplayNodes();
+    cfg.generateDisplayNodes();
 
-    const actualStartNode = cfg.displayNodes[0];
-    const actualConditionNode = cfg.displayNodes[1];
-    const actualIfTrueNode = cfg.displayNodes[2];
-    const actualIfFalseNode = cfg.displayNodes[3];
-    const actualEndNode = cfg.displayNodes[4];
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
+      expectedConditionNode,
+      expectedConditionNodeCallee,
+      expectedNormalNode,
+    ]);
+  });
 
-    expect(actualStartNode).to.deep.equal(expectedStartNode);
-    expect(actualConditionNode).to.deep.equal(expectedConditionNode);
-    expect(actualIfTrueNode).to.deep.equal(expectedIfTrueNode);
-    expect(actualIfFalseNode).to.deep.equal(expectedIfFalseNode);
-    expect(actualEndNode).to.deep.equal(expectedEndNode);
+  test("display nodes generated correctly for IF-ELSE but HAS callees after elseNode", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const conditionNode = formNode(
+      "200",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      200,
+      300
+    );
+    const conditonNodeCallee = formNode(
+      "400",
+      "1000-INIT",
+      NodeType.NORMAL,
+      400,
+      500
+    );
+    const normalNode = formNode(
+      "501",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      501,
+      600
+    );
+    const elseNode = formNode("450", "ELSE", NodeType.CONDITION_ELSE, 450, 500);
+    const normalNodeAfterElse = formNode(
+      "601",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      601,
+      700
+    );
+
+    setCallerCallee(startNode, conditionNode);
+    setCallerCallee(startNode, normalNode);
+    setCallerCallee(conditionNode, conditonNodeCallee);
+    setCallerCallee(conditionNode, elseNode);
+    setCallerCallee(conditionNode, normalNodeAfterElse);
+    cfg.addRawNodes([
+      startNode,
+      conditionNode,
+      conditonNodeCallee,
+      elseNode,
+      normalNodeAfterElse,
+      normalNode,
+    ]);
+
+    const expectedStartNode = structuredClone(startNode);
+    const expectedConditionNode = structuredClone(conditionNode);
+    const expectedConditionNodeCallee = structuredClone(conditonNodeCallee);
+    const expectedNormalNode = structuredClone(normalNode);
+    const expectedNormalNodeAfterElse = structuredClone(normalNodeAfterElse);
+    expectedStartNode.callees = [];
+    expectedConditionNode.callers = [];
+    expectedConditionNode.callees = [];
+    expectedConditionNodeCallee.callers = [];
+    expectedConditionNodeCallee.callees = [];
+    expectedNormalNodeAfterElse.callers = [];
+    expectedNormalNodeAfterElse.callees = [];
+    expectedNormalNode.callers = [];
+    expectedNormalNode.callees = [];
+    setCallerCallee(expectedStartNode, expectedConditionNode);
+    setCallerCallee(expectedConditionNode, expectedConditionNodeCallee);
+    setCallerCallee(expectedConditionNode, expectedNormalNodeAfterElse);
+    setCallerCallee(expectedConditionNodeCallee, expectedNormalNode);
+    setCallerCallee(expectedNormalNodeAfterElse, expectedNormalNode);
+
+    cfg.generateDisplayNodes();
+
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
+      expectedConditionNode,
+      expectedConditionNodeCallee,
+      expectedNormalNodeAfterElse,
+      expectedNormalNode,
+    ]);
   });
 
   test("display nodes generated correctly for IF-ELIF-ELSE", function () {

@@ -31,6 +31,7 @@ export interface Edge {
 }
 
 export class ControlFlowGraph {
+  private rawNodes: Node[] = [];
   private displayNodes: Node[] = [];
   private edges: Edge[] = [];
 
@@ -38,23 +39,38 @@ export class ControlFlowGraph {
     return [...this.displayNodes];
   }
 
-  public addNode(node: Node) {
+  private addDisplayNode(node: Node) {
     if (node) {
       this.displayNodes.push(node);
     }
   }
 
-  public addNodes(nodes: Node[]) {
+  public getRawNodes(): Node[] {
+    return [...this.rawNodes];
+  }
+
+  public addRawNodes(nodes: Node[]) {
     if (nodes.length > 0) {
-      this.displayNodes.push(...nodes);
+      this.rawNodes.push(...nodes);
     }
   }
 
-  public removeNodes(toBeRemovedNodes: Node[]) {
-    if (toBeRemovedNodes.length > 0) {
-      this.displayNodes = this.displayNodes.filter(
-        (n) => !toBeRemovedNodes.includes(n)
-      );
+  private removeRawNodes(nodesToRemove: Node[]) {
+    if (nodesToRemove.length > 0) {
+      this.rawNodes = this.rawNodes.filter((n) => !nodesToRemove.includes(n));
+
+      nodesToRemove.forEach((n) => {
+        const caller = this.getRawNodes().find((r) => r.callees.includes(n.id));
+        if (caller) {
+          caller.callees = caller.callees.filter((c) => c !== n.id);
+        }
+      });
+    }
+  }
+
+  private removeDisplayNodeByIndex(nodeIndexToRemove: number) {
+    if (nodeIndexToRemove !== -1) {
+      this.displayNodes.splice(nodeIndexToRemove, 1);
     }
   }
 
@@ -98,29 +114,31 @@ export class ControlFlowGraph {
     const visitor = new ControlFlowVisitor();
     visitor.visit(tree);
 
-    if (visitor.getNodes().length > 0) {
-      this.addNodes(visitor.getNodes());
-      this.processNodesForDisplay();
-      this.populateEdges();
-    }
+    this.addRawNodes(visitor.getNodes());
+    this.generateDisplayNodes();
   }
 
-  private findCalleesOfUnusedNode(unusedNode: Node): Node[] {
-    const calleesOfUnusedNode: Node[] = [];
-    if (unusedNode && unusedNode.callees.length > 0) {
-      unusedNode.callees.forEach((callee) => {
-        const calleeNode = this.getDisplayNodes().find((n) => n.id === callee);
+  private findCalleesOfRemovedNode(
+    removedNode: Node,
+    rawNodes: Node[]
+  ): Node[] {
+    const calleesOfRemovedNode: Node[] = [];
+    if (removedNode.callees.length > 0) {
+      removedNode.callees.forEach((callee) => {
+        const calleeNode = rawNodes.find((n) => n.id === callee);
         if (calleeNode && calleeNode.callers.length === 1) {
-          calleesOfUnusedNode.push(calleeNode);
-          calleesOfUnusedNode.push(...this.findCalleesOfUnusedNode(calleeNode));
+          calleesOfRemovedNode.push(calleeNode);
+          calleesOfRemovedNode.push(
+            ...this.findCalleesOfRemovedNode(calleeNode, rawNodes)
+          );
         }
       });
     }
 
-    return calleesOfUnusedNode;
+    return calleesOfRemovedNode;
   }
 
-  private hasNormalNodeAsDescendants(parent: Node): boolean {
+  private hasNormalNodeAsDescendants(parent: Node, rawNodes: Node[]): boolean {
     const currentDescendants: string[] = parent.callees;
     let hasNormalNode = false;
 
@@ -129,56 +147,134 @@ export class ControlFlowGraph {
         return;
       }
 
-      const descendantNode = this.getDisplayNodes().find(
-        (n) => n.id === descendant
-      );
+      const descendantNode = rawNodes.find((n) => n.id === descendant);
       if (descendantNode && descendantNode.type === NodeType.NORMAL) {
         hasNormalNode = true;
         return;
       }
 
       if (descendantNode && descendantNode.callees.length > 0) {
-        hasNormalNode = this.hasNormalNodeAsDescendants(descendantNode);
+        hasNormalNode = this.hasNormalNodeAsDescendants(
+          descendantNode,
+          rawNodes
+        );
       }
     });
 
     return hasNormalNode;
   }
 
-  public processNodesForDisplay(): void {
-    const toBeRemovedNodes: Node[] = [];
-    toBeRemovedNodes.push(
-      ...this.getDisplayNodes().filter(
+  private processRawNodesForDisplay(rawNodes: Node[]): void {
+    const removedNodes: Node[] = [];
+    removedNodes.push(
+      ...rawNodes.filter(
         (n) => n.type !== NodeType.START && n.callers.length === 0
       )
     );
 
-    this.getDisplayNodes()
+    rawNodes
       .filter((n) => n.type === NodeType.CONDITION || n.type === NodeType.LOOP)
       .forEach((n) => {
-        if (n.callees.length === 0 || !this.hasNormalNodeAsDescendants(n)) {
-          toBeRemovedNodes.push(n);
+        if (
+          n.callees.length === 0 ||
+          !this.hasNormalNodeAsDescendants(n, rawNodes)
+        ) {
+          removedNodes.push(n);
         }
       });
 
-    [...toBeRemovedNodes].forEach((toBeRemovedNode) => {
-      toBeRemovedNodes.push(...this.findCalleesOfUnusedNode(toBeRemovedNode));
+    [...removedNodes].forEach((removedNode) => {
+      removedNodes.push(
+        ...this.findCalleesOfRemovedNode(removedNode, rawNodes)
+      );
     });
 
-    this.removeNodes(toBeRemovedNodes);
+    this.removeRawNodes(removedNodes);
+  }
 
-    // const startNode = this.getDisplayNodes().find(
-    //   (node) => node.type === NodeType.START
-    // );
-    // if (startNode) {
-    //   const startNodeForDisplay = structuredClone(startNode);
-    //   this.displayNodes.push(startNodeForDisplay);
-    //   this.createForCallees(
-    //     startNodeForDisplay,
-    //     [...startNodeForDisplay.callees],
-    //     false
-    //   );
-    // }
+  public generateDisplayNodes() {
+    this.processRawNodesForDisplay(this.getRawNodes());
+    const startNode = this.getRawNodes()[0];
+    const startNodeForDisplay = structuredClone(startNode);
+    this.displayNodes.push(startNodeForDisplay);
+    this.createDisplayNodesForCallees(
+      startNodeForDisplay,
+      [...startNodeForDisplay.callees],
+      false
+    );
+
+    const conditionNodesForDisplay = this.getDisplayNodes().filter(
+      (n) => n.type === NodeType.CONDITION
+    );
+
+    if (conditionNodesForDisplay.length > 0) {
+      conditionNodesForDisplay.forEach((condNode) => {
+        // search for diverging Node
+        const divergingNode = this.getRawNodes().find(
+          (n) =>
+            n.callers.includes(condNode.id) &&
+            n.type === NodeType.CONDITION_ELSE
+        );
+        const divergingNodeIdx = this.getDisplayNodes().findIndex(
+          (n) => n.id === divergingNode?.id
+        );
+
+        let nodeBeforeConverging: Node = condNode;
+
+        if (divergingNodeIdx !== -1) {
+          const beforeDivergingNode =
+            this.getDisplayNodes()[divergingNodeIdx - 1];
+          const afterDivergingNode =
+            this.getDisplayNodes()[divergingNodeIdx + 1];
+          const rawConditionNode = this.getRawNodes().find(
+            (n) => n.id === condNode.id
+          );
+
+          if (!afterDivergingNode) {
+            return;
+          }
+
+          const hasDivergingCallee =
+            rawConditionNode &&
+            rawConditionNode.callees.includes(afterDivergingNode.id) !==
+              undefined;
+
+          this.removeDisplayNodeByIndex(divergingNodeIdx);
+          beforeDivergingNode.callees.pop();
+          if (!hasDivergingCallee) {
+            beforeDivergingNode.callees.push(afterDivergingNode.id);
+            afterDivergingNode.callers.pop();
+            afterDivergingNode.callers.push(beforeDivergingNode.id);
+          } else {
+            nodeBeforeConverging = beforeDivergingNode;
+            condNode.callees.push(afterDivergingNode.id);
+            afterDivergingNode.callers.pop();
+            afterDivergingNode.callers.push(condNode.id);
+          }
+        }
+
+        // for finding converging node
+        const parentNodeId = condNode.callers[0];
+        const parentNode = this.getRawNodes().find(
+          (n) => n.id === parentNodeId
+        );
+        if (parentNode) {
+          const idxOfConvergingNode =
+            parentNode.callees.findIndex((c) => c === condNode.id) + 1;
+          const convergingNodeId = parentNode.callees[idxOfConvergingNode];
+          const convergingNode = this.getDisplayNodes().find(
+            (n) => n.id === convergingNodeId
+          );
+          if (convergingNode) {
+            nodeBeforeConverging.callees.push(convergingNode.id);
+            convergingNode.callers.push(nodeBeforeConverging.id);
+            if (nodeBeforeConverging.id !== condNode.id) {
+              convergingNode.callers.push(convergingNode.callers.shift()!);
+            }
+          }
+        }
+      });
+    }
   }
 
   /*
@@ -209,101 +305,35 @@ export class ControlFlowGraph {
     
   */
 
-  private findConditionNode(elseNode: Node): Node {
-    let conditionNode;
-    const caller = elseNode.callers[0];
-    const callerNode = this.getDisplayNodes().find((n) => n.id === caller);
-    const conditionNodeList = this.displayNodes.filter(
-      (n) =>
-        n.type === NodeType.CONDITION &&
-        callerNode!.callees.includes(n.id) &&
-        n.startLineNumber < elseNode.startLineNumber &&
-        n.endLineNumber >= elseNode.endLineNumber
-    );
-
-    let conditionStartLineNumber = 0;
-    conditionNodeList.forEach((node) => {
-      if (node.startLineNumber > conditionStartLineNumber) {
-        conditionStartLineNumber = node.startLineNumber;
-        conditionNode = node;
-      }
-    });
-
-    if (conditionNode) {
-      return conditionNode;
-    } else {
-      throw new Error(
-        "Cannot find condition node for ELSE at line " +
-          elseNode.startLineNumber
-      );
-    }
-  }
-
-  public createForCallees(
+  public createDisplayNodesForCallees(
     callerNode: Node,
     callees: String[],
     callerNodeIsDup: boolean
   ): Node {
-    let branchEndNodeIdList: string[] = [];
-    let elseNodeEndLineNumber: number = 0;
     callees.forEach((callee) => {
-      let calleeNode = this.getDisplayNodes().find(
-        (node) => node.id === callee
-      );
+      let calleeNode = this.getRawNodes().find((node) => node.id === callee);
       if (calleeNode) {
-        if (calleeNode.type === NodeType.CONDITION_ELSE) {
-          branchEndNodeIdList.push(callerNode.id);
-          elseNodeEndLineNumber = calleeNode.endLineNumber;
-          callerNode = this.findConditionNode(calleeNode);
-          return;
-        }
-
         calleeNode = structuredClone(calleeNode);
         const hasMultipleCaller = calleeNode.callers.length > 1;
         if (callerNodeIsDup || hasMultipleCaller) {
           calleeNode.id = this.createDupNodesId(calleeNode);
         }
         calleeNode.callers = [callerNode.id];
-        if (
-          callerNode.type === NodeType.CONDITION &&
-          branchEndNodeIdList.length > 0
-        ) {
-          callerNode.callees.push(calleeNode.id);
-        } else {
-          callerNode.callees = [calleeNode.id];
-        }
-        this.displayNodes.push(calleeNode);
-
-        const isMergeNode =
-          elseNodeEndLineNumber !== 0 &&
-          calleeNode.endLineNumber > elseNodeEndLineNumber;
-        if (isMergeNode) {
-          branchEndNodeIdList.push(callerNode.id);
-          calleeNode.callers = [...branchEndNodeIdList];
-          calleeNode.callers.forEach((caller) => {
-            const callerNode = this.displayNodes.find(
-              (node) => node.id === caller
-            );
-            if (callerNode) {
-              callerNode.callees = [calleeNode!.id];
-            }
-          });
-          elseNodeEndLineNumber = 0;
-          branchEndNodeIdList = [];
-        }
+        callerNode.callees = [calleeNode.id];
+        this.addDisplayNode(calleeNode);
 
         const isCallingItself = calleeNode.callers[0].startsWith(
           calleeNode.id.split("_")[0] + "_"
         );
         if (hasMultipleCaller && !isCallingItself) {
-          callerNode = this.createForCallees(
+          callerNode = this.createDisplayNodesForCallees(
             calleeNode,
             [...calleeNode.callees],
             true
           );
           callerNodeIsDup = false;
         } else if (calleeNode.callees.length > 0 && !isCallingItself) {
-          callerNode = this.createForCallees(
+          callerNode = this.createDisplayNodesForCallees(
             calleeNode,
             [...calleeNode.callees],
             false
@@ -324,7 +354,7 @@ export class ControlFlowGraph {
       currentNode.id +
       "_" +
       (
-        this.displayNodes.filter((node) =>
+        this.getDisplayNodes().filter((node) =>
           node.id.startsWith(currentNode.id + "_")
         ).length + 1
       ).toString();

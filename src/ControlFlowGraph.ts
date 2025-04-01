@@ -1,8 +1,27 @@
-import { ControlFlowVisitor, Node, NodeType } from "./ControlFlowVisitor";
+import { ControlFlowVisitor } from "./ControlFlowVisitor";
 import { CharStreams, CommonTokenStream } from "antlr4ts";
 import * as fs from "fs";
 import { VisualCobolLexer } from "./generated/VisualCobolLexer";
 import { VisualCobolParser } from "./generated/VisualCobolParser";
+
+export enum NodeType {
+  START = "start",
+  END = "end",
+  CONDITION = "condition",
+  CONDITION_ELSE = "conditionELSE",
+  LOOP = "loop",
+  NORMAL = "normal",
+}
+
+export interface Node {
+  id: string;
+  label: string;
+  type: NodeType;
+  startLineNumber: number;
+  endLineNumber: number;
+  callers: string[];
+  callees: string[];
+}
 
 export interface Edge {
   id: string;
@@ -12,13 +31,64 @@ export interface Edge {
 }
 
 export class ControlFlowGraph {
-  nodes: Node[] = [];
-  displayNodes: Node[] = [];
-  duplicatedNodes: string[] = [];
-  edges: Edge[] = [];
+  private displayNodes: Node[] = [];
+  private edges: Edge[] = [];
+
+  public getDisplayNodes(): Node[] {
+    return [...this.displayNodes];
+  }
+
+  public addNode(node: Node) {
+    if (node) {
+      this.displayNodes.push(node);
+    }
+  }
+
+  public addNodes(nodes: Node[]) {
+    if (nodes.length > 0) {
+      this.displayNodes.push(...nodes);
+    }
+  }
+
+  public removeNodes(toBeRemovedNodes: Node[]) {
+    if (toBeRemovedNodes.length > 0) {
+      this.displayNodes = this.displayNodes.filter(
+        (n) => !toBeRemovedNodes.includes(n)
+      );
+    }
+  }
+
+  public formEdge(source: string, target: string, isPolyline: boolean): Edge {
+    return {
+      id: source + "-" + target,
+      source: source,
+      target: target,
+      isPolyline: isPolyline,
+    };
+  }
+
+  public getEdges(): Edge[] {
+    return [...this.edges];
+  }
+
+  public addEdge(edge: Edge) {
+    if (edge) {
+      const isValidSourceNode =
+        this.displayNodes.find((n) => n.id === edge.source) !== undefined;
+      const isValidTargetNode =
+        this.displayNodes.find((n) => n.id === edge.target) !== undefined;
+      if (isValidSourceNode && isValidTargetNode) {
+        this.edges.push(edge);
+      }
+    }
+  }
 
   public generateGraph(filePath: string) {
     const fileContent = fs.readFileSync(filePath, "utf-8");
+    // const fileContent = fs.readFileSync(
+    //   "C:/Users/khims/source/repos/visual-cobol-codeflow/out/test/backtesting-summary.cbl",
+    //   "utf-8"
+    // );
     const inputStream = CharStreams.fromString(fileContent);
     const lexer = new VisualCobolLexer(inputStream);
     const tokenStream = new CommonTokenStream(lexer);
@@ -28,24 +98,87 @@ export class ControlFlowGraph {
     const visitor = new ControlFlowVisitor();
     visitor.visit(tree);
 
-    if (visitor.nodes.length > 0) {
-      this.nodes = visitor.nodes;
-      this.createDisplayNodes();
+    if (visitor.getNodes().length > 0) {
+      this.addNodes(visitor.getNodes());
+      this.processNodesForDisplay();
       this.populateEdges();
     }
   }
 
-  public createDisplayNodes(): void {
-    const startNode = this.nodes.find((node) => node.type === NodeType.START);
-    if (startNode) {
-      const startNodeForDisplay = structuredClone(startNode);
-      this.displayNodes.push(startNodeForDisplay);
-      this.createForCallees(
-        startNodeForDisplay,
-        [...startNodeForDisplay.callees],
-        false
-      );
+  private findCalleesOfUnusedNode(unusedNode: Node): Node[] {
+    const calleesOfUnusedNode: Node[] = [];
+    if (unusedNode && unusedNode.callees.length > 0) {
+      unusedNode.callees.forEach((callee) => {
+        const calleeNode = this.getDisplayNodes().find((n) => n.id === callee);
+        if (calleeNode && calleeNode.callers.length === 1) {
+          calleesOfUnusedNode.push(calleeNode);
+          calleesOfUnusedNode.push(...this.findCalleesOfUnusedNode(calleeNode));
+        }
+      });
     }
+
+    return calleesOfUnusedNode;
+  }
+
+  private hasNormalNodeAsDescendants(parent: Node): boolean {
+    const currentDescendants: string[] = parent.callees;
+    let hasNormalNode = false;
+
+    currentDescendants.forEach((descendant) => {
+      if (hasNormalNode) {
+        return;
+      }
+
+      const descendantNode = this.getDisplayNodes().find(
+        (n) => n.id === descendant
+      );
+      if (descendantNode && descendantNode.type === NodeType.NORMAL) {
+        hasNormalNode = true;
+        return;
+      }
+
+      if (descendantNode && descendantNode.callees.length > 0) {
+        hasNormalNode = this.hasNormalNodeAsDescendants(descendantNode);
+      }
+    });
+
+    return hasNormalNode;
+  }
+
+  public processNodesForDisplay(): void {
+    const toBeRemovedNodes: Node[] = [];
+    toBeRemovedNodes.push(
+      ...this.getDisplayNodes().filter(
+        (n) => n.type !== NodeType.START && n.callers.length === 0
+      )
+    );
+
+    this.getDisplayNodes()
+      .filter((n) => n.type === NodeType.CONDITION || n.type === NodeType.LOOP)
+      .forEach((n) => {
+        if (n.callees.length === 0 || !this.hasNormalNodeAsDescendants(n)) {
+          toBeRemovedNodes.push(n);
+        }
+      });
+
+    [...toBeRemovedNodes].forEach((toBeRemovedNode) => {
+      toBeRemovedNodes.push(...this.findCalleesOfUnusedNode(toBeRemovedNode));
+    });
+
+    this.removeNodes(toBeRemovedNodes);
+
+    // const startNode = this.getDisplayNodes().find(
+    //   (node) => node.type === NodeType.START
+    // );
+    // if (startNode) {
+    //   const startNodeForDisplay = structuredClone(startNode);
+    //   this.displayNodes.push(startNodeForDisplay);
+    //   this.createForCallees(
+    //     startNodeForDisplay,
+    //     [...startNodeForDisplay.callees],
+    //     false
+    //   );
+    // }
   }
 
   /*
@@ -76,22 +209,88 @@ export class ControlFlowGraph {
     
   */
 
+  private findConditionNode(elseNode: Node): Node {
+    let conditionNode;
+    const caller = elseNode.callers[0];
+    const callerNode = this.getDisplayNodes().find((n) => n.id === caller);
+    const conditionNodeList = this.displayNodes.filter(
+      (n) =>
+        n.type === NodeType.CONDITION &&
+        callerNode!.callees.includes(n.id) &&
+        n.startLineNumber < elseNode.startLineNumber &&
+        n.endLineNumber >= elseNode.endLineNumber
+    );
+
+    let conditionStartLineNumber = 0;
+    conditionNodeList.forEach((node) => {
+      if (node.startLineNumber > conditionStartLineNumber) {
+        conditionStartLineNumber = node.startLineNumber;
+        conditionNode = node;
+      }
+    });
+
+    if (conditionNode) {
+      return conditionNode;
+    } else {
+      throw new Error(
+        "Cannot find condition node for ELSE at line " +
+          elseNode.startLineNumber
+      );
+    }
+  }
+
   public createForCallees(
     callerNode: Node,
     callees: String[],
     callerNodeIsDup: boolean
   ): Node {
+    let branchEndNodeIdList: string[] = [];
+    let elseNodeEndLineNumber: number = 0;
     callees.forEach((callee) => {
-      let calleeNode = this.nodes.find((node) => node.id === callee);
+      let calleeNode = this.getDisplayNodes().find(
+        (node) => node.id === callee
+      );
       if (calleeNode) {
+        if (calleeNode.type === NodeType.CONDITION_ELSE) {
+          branchEndNodeIdList.push(callerNode.id);
+          elseNodeEndLineNumber = calleeNode.endLineNumber;
+          callerNode = this.findConditionNode(calleeNode);
+          return;
+        }
+
         calleeNode = structuredClone(calleeNode);
         const hasMultipleCaller = calleeNode.callers.length > 1;
         if (callerNodeIsDup || hasMultipleCaller) {
           calleeNode.id = this.createDupNodesId(calleeNode);
         }
         calleeNode.callers = [callerNode.id];
-        callerNode.callees = [calleeNode.id];
+        if (
+          callerNode.type === NodeType.CONDITION &&
+          branchEndNodeIdList.length > 0
+        ) {
+          callerNode.callees.push(calleeNode.id);
+        } else {
+          callerNode.callees = [calleeNode.id];
+        }
         this.displayNodes.push(calleeNode);
+
+        const isMergeNode =
+          elseNodeEndLineNumber !== 0 &&
+          calleeNode.endLineNumber > elseNodeEndLineNumber;
+        if (isMergeNode) {
+          branchEndNodeIdList.push(callerNode.id);
+          calleeNode.callers = [...branchEndNodeIdList];
+          calleeNode.callers.forEach((caller) => {
+            const callerNode = this.displayNodes.find(
+              (node) => node.id === caller
+            );
+            if (callerNode) {
+              callerNode.callees = [calleeNode!.id];
+            }
+          });
+          elseNodeEndLineNumber = 0;
+          branchEndNodeIdList = [];
+        }
 
         const isCallingItself = calleeNode.callers[0].startsWith(
           calleeNode.id.split("_")[0] + "_"
@@ -131,150 +330,5 @@ export class ControlFlowGraph {
       ).toString();
 
     return dupNodeId;
-  }
-
-  public populateEdges(): void {
-    this.edges = [];
-    const startNode = this.nodes.find((node) => node.type === NodeType.START);
-
-    if (startNode) {
-      this.formEdge(
-        startNode.id,
-        startNode.callees
-          .map((callee) => {
-            const calleeObj = this.nodes.find((node) => node.id === callee);
-
-            return calleeObj;
-          })
-          .filter((node) => node !== undefined)
-      );
-
-      //const endNode = this.nodes.find((node) => node.type === NodeType.END);
-      //this.formEdge(lastNode, endNode ? [endNode] : []);
-    }
-  }
-
-  private createForNodeWithMultipleCallers(node: Node): Node[] {
-    const result: Node[] = [];
-    const delimiter = "_";
-    const prefix = node.id + delimiter;
-    const callers = node.callers;
-    for (let i = 0; i < callers.length; i++) {
-      const caller = callers[i];
-
-      const newNode: Node = {
-        id: prefix + (i + 1).toString(),
-        label: node.label,
-        type: node.type,
-        startLineNumber: node.startLineNumber,
-        endLineNumber: node.endLineNumber,
-        callers: [caller],
-        callees: node.callees,
-      };
-
-      this.duplicatedNodes.push(node.id);
-      result.push(newNode);
-    }
-
-    result.push(
-      ...this.createCalleeNodesFrom(
-        [...node.callees],
-        callers.length,
-        delimiter
-      )
-    );
-
-    return result;
-  }
-
-  private createCalleeNodesFrom(
-    callees: string[],
-    numOfCallers: number,
-    delimiter: string
-  ): Node[] {
-    const result: Node[] = [];
-    if (callees.length > 0) {
-      const calleeNode = this.nodes.find((node) => node.id === callees[0]);
-
-      if (calleeNode) {
-        for (let i = 0; i < numOfCallers; i++) {
-          const newCalleeId = calleeNode.id + delimiter + (i + 1);
-          const newCalleeNode: Node = {
-            id: newCalleeId,
-            label: calleeNode.label,
-            type: calleeNode.type,
-            startLineNumber: calleeNode.startLineNumber,
-            endLineNumber: calleeNode.endLineNumber,
-            callers: calleeNode.callers,
-            callees: calleeNode.callees,
-          };
-
-          this.duplicatedNodes.push(calleeNode.id);
-          result.push(newCalleeNode);
-          result.push(
-            ...this.createCalleeNodesFrom(
-              [...calleeNode.callees],
-              numOfCallers,
-              delimiter
-            )
-          );
-        }
-      }
-
-      callees.splice(0, 1);
-      result.push(
-        ...this.createCalleeNodesFrom(callees, numOfCallers, delimiter)
-      );
-    }
-
-    return result;
-  }
-
-  private formEdge(source: string, target: Node[]): string {
-    for (let i = 0; i < target.length; i++) {
-      let targetNode = target[i];
-
-      if (this.duplicatedNodes.includes(targetNode.id)) {
-        const dupTargetNode = this.displayNodes.find(
-          (node) =>
-            node.id.startsWith(targetNode.id) &&
-            !this.edges.find((e) => e.source === node.id)
-        );
-
-        if (dupTargetNode) {
-          targetNode = dupTargetNode;
-        }
-      }
-
-      const edge: Edge = {
-        id: source + "-" + targetNode.id,
-        source: source,
-        target: targetNode.id,
-        isPolyline: false,
-      };
-
-      if (this.edges.find((e) => e.id === edge.id)) {
-        continue;
-      }
-
-      this.edges.push(edge);
-
-      const targetNodeCallees = targetNode.callees
-        .map((callee) => {
-          const calleeObj = this.nodes.find((node) => node.id === callee);
-
-          return calleeObj;
-        })
-        .filter((node) => node !== undefined);
-
-      source = edge.target;
-
-      const newSource = this.formEdge(source, targetNodeCallees);
-
-      source = newSource;
-    }
-
-    const lastNode = source;
-    return lastNode;
   }
 }

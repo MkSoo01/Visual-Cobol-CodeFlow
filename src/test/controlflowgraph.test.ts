@@ -8,439 +8,408 @@ const expect = chai.expect;
 
 suite("Tests for Control Flow Graph", () => {
   let cfg: ControlFlowGraph;
-  const startNode: Node = {
-    id: "100",
-    label: "0000-MAIN-ROUTINE",
-    type: NodeType.START,
-    startLineNumber: 100,
-    endLineNumber: 150,
-    callers: [],
-    callees: ["1000-INIT", "2000-PROCESS"],
-  };
-  const endNode: Node = {
-    id: "150",
-    label: "0000-EXIT",
-    type: NodeType.END,
-    startLineNumber: 150,
-    endLineNumber: 150,
-    callers: [],
-    callees: [],
-  };
-  const nodeWithMultipleCallers: Node = {
-    id: "500",
-    label: "3000-PROCESS-DATA",
-    type: NodeType.NORMAL,
-    startLineNumber: 500,
-    endLineNumber: 550,
-    callers: ["1000-INIT", "8005-GET-DATE"],
-    callees: ["8006-AUDIT-DATA"],
-  };
-
-  const testData1: Node[] = [
-    {
-      id: "235",
-      label: "0000-MAIN-ROUTINE",
-      type: NodeType.START,
-      startLineNumber: 235,
-      endLineNumber: 256,
-      callers: [],
-      callees: [
-        "1000-INIT",
-        "8001-GET-DATE",
-        "245",
-        "8015-DELETE",
-        "2000-PROCESS",
-      ],
-    },
-    {
-      id: "256",
-      label: "0000-EXIT",
-      type: NodeType.END,
-      startLineNumber: 256,
-      endLineNumber: 256,
-      callers: [],
-      callees: [],
-    },
-    {
-      id: "245",
-      label: "IF DT-BUSINESS OF BUSINESS-DATES NOT EQUALS SPACES",
-      type: NodeType.CONDITION,
-      startLineNumber: 245,
-      endLineNumber: 253,
-      callers: ["0000-MAIN-ROUTINE"],
-      callees: [],
-    },
-    {
-      id: "271",
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-      startLineNumber: 271,
-      endLineNumber: 274,
-      callers: ["0000-MAIN-ROUTINE"],
-      callees: [],
-    },
-    {
-      id: "279",
-      label: "2000-PROCESS",
-      type: NodeType.NORMAL,
-      startLineNumber: 279,
-      endLineNumber: 288,
-      callers: ["0000-MAIN-ROUTINE"],
-      callees: ["2100-PROCESS-MARGIN"],
-    },
-    {
-      id: "294",
-      label: "2100-PROCESS-MARGIN",
-      type: NodeType.NORMAL,
-      startLineNumber: 294,
-      endLineNumber: 319,
-      callers: ["2000-PROCESS"],
-      callees: [
-        "8004-OPEN-BUYER-SELLER",
-        "8005-FETCH-BUYER-SELLER",
-        "304",
-        "305",
-        "8009-GET-NM-PARTICIPANT",
-        "2200-GET-SUMMARY",
-        "8005-FETCH-BUYER-SELLER",
-      ],
-    },
-    {
-      id: "304",
-      label: "IF ID-COUNTER-PREV NOT EQUALS ZEROS",
-      type: NodeType.CONDITION,
-      startLineNumber: 304,
-      endLineNumber: 317,
-      callers: ["2100-PROCESS-MARGIN"],
-      callees: [],
-    },
-    {
-      id: "305",
-      label: "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
-      type: NodeType.LOOP,
-      startLineNumber: 305,
-      endLineNumber: 316,
-      callers: ["2100-PROCESS-MARGIN"],
-      callees: [],
-    },
-    {
-      id: "324",
-      label: "2200-GET-SUMMARY",
-      type: NodeType.NORMAL,
-      startLineNumber: 324,
-      endLineNumber: 376,
-      callers: ["2100-PROCESS-MARGIN"],
-      callees: [
-        "8003-GET-IDCOUNTER",
-        "8002-FETCH-IDCOUNTER",
-        "339",
-        "340",
-        "3000-GET-OFFICIAL-RATE",
-        "3100-GET-FHVAR",
-        "8010-GET-CHANGE-PRICE",
-        "8011-GET-MTMSELLER-1",
-        "8012-GET-MTMSELLER",
-        "8013-GET-MTMBUYER-1",
-        "8014-GET-MTMBUYER",
-        "2201-PROCESS-SUMMARY",
-        "8002-FETCH-IDCOUNTER",
-        "2202-INSERT-BACKTESTING",
-        "8016-INSERT",
-      ],
-    },
-    {
-      id: "339",
-      label: "IF ID-COUNTER-PREV NOT EQUALS ZEROS",
-      type: NodeType.CONDITION,
-      startLineNumber: 339,
-      endLineNumber: 375,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "340",
-      label: "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
-      type: NodeType.LOOP,
-      startLineNumber: 340,
-      endLineNumber: 370,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "378",
-      label: "3000-GET-OFFICIAL-RATE",
-      type: NodeType.NORMAL,
-      startLineNumber: 378,
-      endLineNumber: 396,
-      callers: ["2200-GET-SUMMARY"],
-      callees: ["388"],
-    },
-    {
-      id: "388",
-      label: "IF COUNTER-OFFICIAL-RATE EQUALS ZEROES",
-      type: NodeType.CONDITION,
-      startLineNumber: 388,
-      endLineNumber: 394,
-      callers: ["3000-GET-OFFICIAL-RATE"],
-      callees: [],
-    },
-    {
-      id: "398",
-      label: "3100-GET-FHVAR",
-      type: NodeType.NORMAL,
-      startLineNumber: 398,
-      endLineNumber: 414,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "419",
-      label: "2201-PROCESS-SUMMARY",
-      type: NodeType.NORMAL,
-      startLineNumber: 419,
-      endLineNumber: 440,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "442",
-      label: "2202-INSERT-BACKTESTING",
-      type: NodeType.NORMAL,
-      startLineNumber: 442,
-      endLineNumber: 454,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "459",
-      label: "2203-CLEAR-STAGING",
-      type: NodeType.NORMAL,
-      startLineNumber: 459,
-      endLineNumber: 477,
-      callers: ["8005-FETCH-BUYER-SELLER"],
-      callees: [],
-    },
-    {
-      id: "482",
-      label: "8001-GET-DATE",
-      type: NodeType.NORMAL,
-      startLineNumber: 482,
-      endLineNumber: 497,
-      callers: ["0000-MAIN-ROUTINE"],
-      callees: [],
-    },
-    {
-      id: "499",
-      label: "8002-FETCH-IDCOUNTER",
-      type: NodeType.NORMAL,
-      startLineNumber: 499,
-      endLineNumber: 512,
-      callers: ["2200-GET-SUMMARY", "2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "515",
-      label: "8003-GET-IDCOUNTER",
-      type: NodeType.NORMAL,
-      startLineNumber: 515,
-      endLineNumber: 525,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "530",
-      label: "8004-OPEN-BUYER-SELLER",
-      type: NodeType.NORMAL,
-      startLineNumber: 530,
-      endLineNumber: 539,
-      callers: ["2100-PROCESS-MARGIN"],
-      callees: [],
-    },
-    {
-      id: "544",
-      label: "8005-FETCH-BUYER-SELLER",
-      type: NodeType.NORMAL,
-      startLineNumber: 544,
-      endLineNumber: 560,
-      callers: ["2100-PROCESS-MARGIN", "2100-PROCESS-MARGIN"],
-      callees: ["2203-CLEAR-STAGING", "8010A-GET-MAX-DT-FHVAR"],
-    },
-    {
-      id: "613",
-      label: "8009-GET-NM-PARTICIPANT",
-      type: NodeType.NORMAL,
-      startLineNumber: 613,
-      endLineNumber: 625,
-      callers: ["2100-PROCESS-MARGIN"],
-      callees: [],
-    },
-    {
-      id: "630",
-      label: "8010-GET-CHANGE-PRICE",
-      type: NodeType.NORMAL,
-      startLineNumber: 630,
-      endLineNumber: 646,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "651",
-      label: "8010A-GET-MAX-DT-FHVAR",
-      type: NodeType.NORMAL,
-      startLineNumber: 651,
-      endLineNumber: 663,
-      callers: ["8005-FETCH-BUYER-SELLER"],
-      callees: [],
-    },
-    {
-      id: "668",
-      label: "8011-GET-MTMSELLER-1",
-      type: NodeType.NORMAL,
-      startLineNumber: 668,
-      endLineNumber: 685,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "688",
-      label: "8012-GET-MTMSELLER",
-      type: NodeType.NORMAL,
-      startLineNumber: 688,
-      endLineNumber: 706,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "709",
-      label: "8013-GET-MTMBUYER-1",
-      type: NodeType.NORMAL,
-      startLineNumber: 709,
-      endLineNumber: 726,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "729",
-      label: "8014-GET-MTMBUYER",
-      type: NodeType.NORMAL,
-      startLineNumber: 729,
-      endLineNumber: 749,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-    {
-      id: "751",
-      label: "8015-DELETE",
-      type: NodeType.NORMAL,
-      startLineNumber: 751,
-      endLineNumber: 765,
-      callers: ["0000-MAIN-ROUTINE"],
-      callees: [],
-    },
-    {
-      id: "770",
-      label: "8016-INSERT",
-      type: NodeType.NORMAL,
-      startLineNumber: 770,
-      endLineNumber: 799,
-      callers: ["2200-GET-SUMMARY"],
-      callees: [],
-    },
-  ];
-  const testData2: Node[] = [
-    startNode,
-    endNode,
-    {
-      id: "200",
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-      startLineNumber: 200,
-      endLineNumber: 250,
-      callers: ["0000-MAIN-ROUTINE"],
-      callees: [],
-    },
-    {
-      id: "300",
-      label: "2000-PROCESS",
-      type: NodeType.NORMAL,
-      startLineNumber: 300,
-      endLineNumber: 350,
-      callers: ["0000-MAIN-ROUTINE"],
-      callees: ["8005-GET-DATE"],
-    },
-    {
-      id: "400",
-      label: "8005-GET-DATE",
-      type: NodeType.NORMAL,
-      startLineNumber: 400,
-      endLineNumber: 450,
-      callers: ["2000-PROCESS"],
-      callees: [],
-    },
-  ];
-  const testData3: Node[] = [
-    ...testData2,
-    nodeWithMultipleCallers,
-    {
-      id: "600",
-      label: "8006-AUDIT-DATA",
-      type: NodeType.NORMAL,
-      startLineNumber: 600,
-      endLineNumber: 650,
-      callers: ["3000-PROCESS-DATA"],
-      callees: ["8007-UPDATE-DATA"],
-    },
-    {
-      id: "700",
-      label: "8007-UPDATE-DATA",
-      type: NodeType.NORMAL,
-      startLineNumber: 700,
-      endLineNumber: 750,
-      callers: ["8006-AUDIT-DATA"],
-      callees: [],
-    },
-  ];
-
-  // find the callees of the condition node based on the startlinenumber and endlinenumber
-  // find a way to differentiate else if and else from the
-  // callees of the condition node
-
-  // find the callees of the loop node based on the startlinenumber and endlinenumber
-  // node with multiple caller need to be duplicated to be displayed
-  // and it includes the callees of the node with multiple callers and its callees recursively until no callee left
-
-  // simple scenario 1: no nodes with multiple callers, no condition node and loop node
-  // just start node, normal node and end node
 
   setup(async function () {
     cfg = new ControlFlowGraph();
   });
 
-  function getStartNode(): Node {
+  function formNode(
+    id: string,
+    label: string,
+    type: NodeType,
+    startLineNumber: number,
+    endLineNumber: number
+  ): Node {
     return {
-      id: "500",
+      id: id,
+      label: label,
+      type: type,
+      startLineNumber: startLineNumber,
+      endLineNumber: endLineNumber,
       callers: [],
       callees: [],
-      startLineNumber: 100,
-      endLineNumber: 200,
-      label: "0000-START",
-      type: NodeType.START,
     };
   }
 
-  function getEndNode(): Node {
-    return {
-      id: "600",
-      callers: [],
-      callees: [],
-      startLineNumber: 300,
-      endLineNumber: 400,
-      label: "0000-END",
-      type: NodeType.END,
-    };
+  function setCallerCallee(caller: Node, callee: Node) {
+    caller.callees.push(callee.id);
+    callee.callers.push(caller.id);
   }
 
-  test("display nodes generated correctly for simple scenario with one normal node, start node and end node", function () {
+  test("the normal node with no caller will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const normalNodeLabelWithNoCaller = "1000-INIT";
+
+    const normalNodeWithNoCaller = formNode(
+      "400",
+      normalNodeLabelWithNoCaller,
+      NodeType.NORMAL,
+      400,
+      500
+    );
+
+    cfg.addNodes([startNode, normalNodeWithNoCaller]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("the callees will be removed if its caller is removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const normalNodeLabelWithNoCaller = "1000-INIT";
+
+    const normalNodeWithNoCaller = formNode(
+      "400",
+      normalNodeLabelWithNoCaller,
+      NodeType.NORMAL,
+      400,
+      500
+    );
+
+    const calleeNode = formNode(
+      "501",
+      "1100-TEST-INIT",
+      NodeType.NORMAL,
+      501,
+      600
+    );
+
+    setCallerCallee(normalNodeWithNoCaller, calleeNode);
+
+    cfg.addNodes([startNode, normalNodeWithNoCaller, calleeNode]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("the descesdant callees will be removed RECURSIVELY if its ancestor caller is removed", function () {
+    const startNode: Node = formNode(
+      "100",
+      "0000-START",
+      NodeType.START,
+      100,
+      200
+    );
+
+    const ancestorNode = formNode(
+      "200",
+      "1000-INIT",
+      NodeType.NORMAL,
+      200,
+      300
+    );
+
+    const calleeNode = formNode(
+      "301",
+      "1100-TEST-INIT",
+      NodeType.NORMAL,
+      301,
+      400
+    );
+
+    const calleeNodeDescendant = formNode(
+      "401",
+      "1200-TEST-INIT",
+      NodeType.NORMAL,
+      401,
+      500
+    );
+
+    setCallerCallee(ancestorNode, calleeNode);
+    setCallerCallee(calleeNode, calleeNodeDescendant);
+    cfg.addNodes([startNode, ancestorNode, calleeNode, calleeNodeDescendant]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("the condition node with no callee will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const conditionNode = formNode(
+      "400",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      400,
+      500
+    );
+
+    setCallerCallee(startNode, conditionNode);
+    cfg.addNodes([startNode, conditionNode]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("the condition node will be removed when there's no descendant is a normal node", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const conditionNode = formNode(
+      "400",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      400,
+      800
+    );
+
+    const nestedConditionNode = formNode(
+      "501",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      501,
+      600
+    );
+
+    const nestedElseNode = formNode(
+      "550",
+      "ELSE",
+      NodeType.CONDITION_ELSE,
+      550,
+      600
+    );
+
+    const elseNode = formNode("601", "ELSE", NodeType.CONDITION_ELSE, 601, 700);
+
+    setCallerCallee(startNode, conditionNode);
+    setCallerCallee(conditionNode, nestedConditionNode);
+    setCallerCallee(conditionNode, elseNode);
+    setCallerCallee(nestedConditionNode, nestedElseNode);
+
+    cfg.addNodes([
+      startNode,
+      conditionNode,
+      nestedConditionNode,
+      nestedElseNode,
+      elseNode,
+    ]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("the condition node will NOT be removed when there's a normal node as descendant", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const conditionNode = formNode(
+      "400",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      400,
+      800
+    );
+
+    const nestedConditionNode = formNode(
+      "501",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      501,
+      600
+    );
+
+    const elseNode = formNode("601", "ELSE", NodeType.CONDITION_ELSE, 601, 700);
+    const normalNodeDescendant = formNode(
+      "900",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      900,
+      1000
+    );
+
+    setCallerCallee(startNode, conditionNode);
+    setCallerCallee(conditionNode, nestedConditionNode);
+    setCallerCallee(conditionNode, elseNode);
+    setCallerCallee(nestedConditionNode, normalNodeDescendant);
+
+    cfg.addNodes([
+      startNode,
+      conditionNode,
+      nestedConditionNode,
+      normalNodeDescendant,
+      elseNode,
+    ]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(5);
+    expect(cfg.getDisplayNodes()).to.have.members([
+      startNode,
+      conditionNode,
+      nestedConditionNode,
+      normalNodeDescendant,
+      elseNode,
+    ]);
+  });
+
+  test("the condition node with no caller will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const conditionNodeLabelWithNoCaller = "IF OFFICIAL-RATE EQUALS ZEROES";
+
+    const conditionNodeWithNoCaller = formNode(
+      "400",
+      conditionNodeLabelWithNoCaller,
+      NodeType.CONDITION,
+      400,
+      500
+    );
+    const conditionNodeCallee = formNode(
+      "501",
+      "1000-INIT",
+      NodeType.NORMAL,
+      501,
+      600
+    );
+
+    cfg.addNodes([startNode, conditionNodeWithNoCaller, conditionNodeCallee]);
+    setCallerCallee(conditionNodeWithNoCaller, conditionNodeCallee);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("the loop node with no callee will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const loopNode = formNode(
+      "400",
+      "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
+      NodeType.LOOP,
+      400,
+      500
+    );
+
+    setCallerCallee(startNode, loopNode);
+    cfg.addNodes([startNode, loopNode]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("the loop node will be removed when there's no descendant is a normal node", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const loopNode = formNode(
+      "400",
+      "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
+      NodeType.LOOP,
+      400,
+      800
+    );
+
+    const nestedConditionNode = formNode(
+      "501",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      501,
+      600
+    );
+
+    const nestedElseNode = formNode(
+      "550",
+      "ELSE",
+      NodeType.CONDITION_ELSE,
+      550,
+      600
+    );
+
+    setCallerCallee(startNode, loopNode);
+    setCallerCallee(loopNode, nestedConditionNode);
+    setCallerCallee(nestedConditionNode, nestedElseNode);
+
+    cfg.addNodes([startNode, loopNode, nestedConditionNode, nestedElseNode]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("the loop node will NOT be removed when there's a normal node as descendant", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+
+    const loopNode = formNode(
+      "400",
+      "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
+      NodeType.LOOP,
+      400,
+      800
+    );
+
+    const nestedConditionNode = formNode(
+      "501",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      501,
+      600
+    );
+
+    const normalNodeDescendant = formNode(
+      "900",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      900,
+      1000
+    );
+
+    setCallerCallee(startNode, loopNode);
+    setCallerCallee(loopNode, nestedConditionNode);
+    setCallerCallee(nestedConditionNode, normalNodeDescendant);
+
+    cfg.addNodes([
+      startNode,
+      loopNode,
+      nestedConditionNode,
+      normalNodeDescendant,
+    ]);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(4);
+    expect(cfg.getDisplayNodes()).to.have.members([
+      startNode,
+      loopNode,
+      nestedConditionNode,
+      normalNodeDescendant,
+    ]);
+  });
+
+  test("the loop node with no caller will be removed", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const loopNodeLabelWithNoCaller = "PERFORM UNTIL SQLCODE = CC-NOT-FOUND";
+
+    const loopNodeWithNoCaller = formNode(
+      "400",
+      loopNodeLabelWithNoCaller,
+      NodeType.LOOP,
+      400,
+      500
+    );
+
+    const callee = formNode("501", "2000-PROCESS", NodeType.NORMAL, 501, 600);
+
+    cfg.addNodes([startNode, loopNodeWithNoCaller, callee]);
+    setCallerCallee(loopNodeWithNoCaller, callee);
+
+    cfg.processNodesForDisplay();
+
+    expect(cfg.getDisplayNodes().length).to.equal(1);
+    expect(cfg.getDisplayNodes()).to.have.members([startNode]);
+  });
+
+  test("display nodes generated correctly for simple with one normal node, start node and end node", function () {
     const startNode = getStartNode();
     const endNode = getEndNode();
 
@@ -779,11 +748,9 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  test("display nodes generated correctly for simple scenario with one normal node, one condition node, start node and end node", function () {
+  test("display nodes generated correctly for IF", function () {
     const startNode = getStartNode();
     const endNode = getEndNode();
-
-    const normalNodeLabel = "1000-INIT";
 
     const normalNode: Node = {
       id: "700",
@@ -791,7 +758,7 @@ suite("Tests for Control Flow Graph", () => {
       callees: [],
       startLineNumber: 700,
       endLineNumber: 800,
-      label: normalNodeLabel,
+      label: "1000-INIT",
       type: NodeType.NORMAL,
     };
 
@@ -836,7 +803,389 @@ suite("Tests for Control Flow Graph", () => {
     expect(actualEndNode).to.deep.equal(expectedEndNode);
   });
 
-  // TODO: test else if and nested if and else node
+  // TODO: take out the logic for condition to another function
+  // so the idea is to check by endif and if the caller is condition node then
+  // remove both condition and endif node from display node and bind the
+  // caller of condition node and callee of the endif node together, the same applied
+  // to else node
+  // check there's any else node in between if and endif node, if none then
+  // push the condition node as caller for the callee of endif node and vice versa,
+  // remove the end if node afterwards
+  // scenario 1: if have normal node, no else
+  // scenario 2: if have normal node, have else, no normal node
+  // scenario 3: if have normal node, have else, have normal node
+  // scenario 4: if don't have normal node, no else
+  // scenario 5: if don't have normal node, have else, no normal node
+  // scenario 6: if don't have normal node, have else, have normal node
+
+  test("display nodes generated correctly for IF-ELSE", function () {
+    const startNode = getStartNode();
+    const endNode = getEndNode();
+
+    const conditionNodeLabel = "IF OFFICIAL-RATE EQUALS ZEROES";
+    const conditionNode: Node = {
+      id: "400",
+      callers: [],
+      callees: [],
+      startLineNumber: 400,
+      endLineNumber: 850,
+      label: conditionNodeLabel,
+      type: NodeType.CONDITION,
+    };
+
+    const ifTrueNode: Node = {
+      id: "500",
+      callers: [],
+      callees: [],
+      startLineNumber: 500,
+      endLineNumber: 600,
+      label: "1000-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    const elseNode: Node = {
+      id: "601",
+      callers: [],
+      callees: [],
+      startLineNumber: 601,
+      endLineNumber: 800,
+      label: "ELSE",
+      type: NodeType.CONDITION_ELSE,
+    };
+
+    const ifFalseNode: Node = {
+      id: "700",
+      callers: [],
+      callees: [],
+      startLineNumber: 700,
+      endLineNumber: 800,
+      label: "2000-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    conditionNode.callers.push(startNode.id);
+    ifTrueNode.callers.push(startNode.id);
+    elseNode.callers.push(startNode.id);
+    ifFalseNode.callers.push(startNode.id);
+    startNode.callees = [
+      conditionNode.id,
+      ifTrueNode.id,
+      elseNode.id,
+      ifFalseNode.id,
+      endNode.id,
+    ];
+    endNode.callers.push(startNode.id);
+    cfg.nodes = [
+      startNode,
+      conditionNode,
+      ifTrueNode,
+      elseNode,
+      ifFalseNode,
+      endNode,
+    ];
+
+    const expectedStartNode = getStartNode();
+    const expectedConditionNode: Node = structuredClone(conditionNode);
+    const expectedIfTrueNode: Node = structuredClone(ifTrueNode);
+    const expectedIfFalseNode: Node = structuredClone(ifFalseNode);
+    const expectedEndNode = getEndNode();
+    expectedStartNode.callees = [expectedConditionNode.id];
+    expectedConditionNode.callers = [expectedStartNode.id];
+    expectedConditionNode.callees = [
+      expectedIfTrueNode.id,
+      expectedIfFalseNode.id,
+    ];
+    expectedIfTrueNode.callers = [expectedConditionNode.id];
+    expectedIfTrueNode.callees = [expectedEndNode.id];
+    expectedIfFalseNode.callers = [expectedConditionNode.id];
+    expectedIfFalseNode.callees = [expectedEndNode.id];
+    expectedEndNode.callers = [expectedIfTrueNode.id, expectedIfFalseNode.id];
+
+    cfg.createDisplayNodes();
+
+    const actualStartNode = cfg.displayNodes[0];
+    const actualConditionNode = cfg.displayNodes[1];
+    const actualIfTrueNode = cfg.displayNodes[2];
+    const actualIfFalseNode = cfg.displayNodes[3];
+    const actualEndNode = cfg.displayNodes[4];
+
+    expect(actualStartNode).to.deep.equal(expectedStartNode);
+    expect(actualConditionNode).to.deep.equal(expectedConditionNode);
+    expect(actualIfTrueNode).to.deep.equal(expectedIfTrueNode);
+    expect(actualIfFalseNode).to.deep.equal(expectedIfFalseNode);
+    expect(actualEndNode).to.deep.equal(expectedEndNode);
+  });
+
+  test("display nodes generated correctly for IF-ELIF-ELSE", function () {
+    const startNode = getStartNode();
+    const endNode = getEndNode();
+
+    const conditionNodeLabel = "IF OFFICIAL-RATE EQUALS ZEROES";
+    const conditionNode: Node = {
+      id: "400",
+      callers: [],
+      callees: [],
+      startLineNumber: 400,
+      endLineNumber: 850,
+      label: conditionNodeLabel,
+      type: NodeType.CONDITION,
+    };
+
+    const ifTrueNode: Node = {
+      id: "401",
+      callers: [],
+      callees: [],
+      startLineNumber: 401,
+      endLineNumber: 500,
+      label: "1000-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    const elseNode1: Node = {
+      id: "501",
+      callers: [],
+      callees: [],
+      startLineNumber: 501,
+      endLineNumber: 700,
+      label: "ELSE",
+      type: NodeType.CONDITION_ELSE,
+    };
+
+    const conditionNode2: Node = {
+      id: "502",
+      callers: [],
+      callees: [],
+      startLineNumber: 502,
+      endLineNumber: 600,
+      label: conditionNodeLabel,
+      type: NodeType.NORMAL,
+    };
+
+    const elseIfTrueNode: Node = {
+      id: "503",
+      callers: [],
+      callees: [],
+      startLineNumber: 503,
+      endLineNumber: 600,
+      label: "2000-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    const elseNode2: Node = {
+      id: "601",
+      callers: [],
+      callees: [],
+      startLineNumber: 601,
+      endLineNumber: 800,
+      label: "ELSE",
+      type: NodeType.CONDITION_ELSE,
+    };
+
+    const elseIfFalseNode: Node = {
+      id: "602",
+      callers: [],
+      callees: [],
+      startLineNumber: 602,
+      endLineNumber: 800,
+      label: "3000-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    conditionNode.callers.push(startNode.id);
+    ifTrueNode.callers.push(startNode.id);
+    elseNode1.callers.push(startNode.id);
+    conditionNode2.callers.push(startNode.id);
+    elseIfTrueNode.callers.push(startNode.id);
+    elseNode2.callers.push(startNode.id);
+    elseIfFalseNode.callers.push(startNode.id);
+    startNode.callees = [
+      conditionNode.id,
+      ifTrueNode.id,
+      elseNode1.id,
+      conditionNode2.id,
+      elseIfTrueNode.id,
+      elseNode2.id,
+      elseIfFalseNode.id,
+      endNode.id,
+    ];
+    endNode.callers.push(startNode.id);
+    cfg.nodes = [
+      startNode,
+      conditionNode,
+      ifTrueNode,
+      elseNode1,
+      conditionNode2,
+      elseIfTrueNode,
+      elseNode2,
+      elseIfFalseNode,
+      endNode,
+    ];
+
+    const expectedStartNode = getStartNode();
+    const expectedConditionNode: Node = structuredClone(conditionNode);
+    const expectedIfTrueNode: Node = structuredClone(ifTrueNode);
+    const expectedConditionNode2: Node = structuredClone(conditionNode2);
+    const expectedElseIfTrueNode: Node = structuredClone(elseIfTrueNode);
+    const expectedElseIfFalseNode: Node = structuredClone(elseIfFalseNode);
+    const expectedEndNode = getEndNode();
+    expectedStartNode.callees = [expectedConditionNode.id];
+    expectedConditionNode.callers = [expectedStartNode.id];
+    expectedConditionNode.callees = [expectedIfTrueNode.id, conditionNode2.id];
+    expectedIfTrueNode.callers = [expectedConditionNode.id];
+    expectedIfTrueNode.callees = [expectedEndNode.id];
+    expectedConditionNode2.callers = [expectedConditionNode.id];
+    expectedConditionNode2.callees = [
+      expectedElseIfTrueNode.id,
+      expectedElseIfFalseNode.id,
+    ];
+    expectedElseIfTrueNode.callers = [expectedConditionNode2.id];
+    expectedElseIfTrueNode.callees = [expectedEndNode.id];
+    expectedElseIfFalseNode.callers = [expectedConditionNode2.id];
+    expectedElseIfFalseNode.callees = [expectedEndNode.id];
+    expectedEndNode.callers = [
+      expectedIfTrueNode.id,
+      expectedElseIfTrueNode.id,
+      expectedElseIfFalseNode.id,
+    ];
+
+    cfg.createDisplayNodes();
+
+    const actualStartNode = cfg.displayNodes[0];
+    const actualConditionNode = cfg.displayNodes[1];
+    const actualIfTrueNode = cfg.displayNodes[2];
+    const actualConditionNode2 = cfg.displayNodes[3];
+    const actualElseIfTrueNode = cfg.displayNodes[4];
+    const actualElseIfFalseNode = cfg.displayNodes[5];
+    const actualEndNode = cfg.displayNodes[6];
+
+    expect(actualStartNode).to.deep.equal(expectedStartNode);
+    expect(actualConditionNode).to.deep.equal(expectedConditionNode);
+    expect(actualIfTrueNode).to.deep.equal(actualIfTrueNode);
+    expect(actualConditionNode2).to.deep.equal(expectedConditionNode2);
+    expect(actualElseIfTrueNode).to.deep.equal(expectedElseIfTrueNode);
+    expect(actualElseIfFalseNode).to.deep.equal(expectedElseIfFalseNode);
+    expect(actualEndNode).to.deep.equal(expectedEndNode);
+  });
+
+  test("display nodes generated correctly for nested IF-ELSE", function () {
+    const startNode = getStartNode();
+    const endNode = getEndNode();
+
+    const conditionNodeLabel = "IF OFFICIAL-RATE EQUALS ZEROES";
+    const conditionNode: Node = {
+      id: "400",
+      callers: [],
+      callees: [],
+      startLineNumber: 400,
+      endLineNumber: 850,
+      label: conditionNodeLabel,
+      type: NodeType.CONDITION,
+    };
+
+    const nestedConditionNode: Node = {
+      id: "500",
+      callers: [],
+      callees: [],
+      startLineNumber: 500,
+      endLineNumber: 800,
+      label: conditionNodeLabel,
+      type: NodeType.CONDITION,
+    };
+
+    const nestedIfTrueNode: Node = {
+      id: "600",
+      callers: [],
+      callees: [],
+      startLineNumber: 600,
+      endLineNumber: 700,
+      label: "1000-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    const elseNode: Node = {
+      id: "701",
+      callers: [],
+      callees: [],
+      startLineNumber: 701,
+      endLineNumber: 800,
+      label: "ELSE",
+      type: NodeType.CONDITION_ELSE,
+    };
+
+    const nestedIfFalseNode: Node = {
+      id: "702",
+      callers: [],
+      callees: [],
+      startLineNumber: 702,
+      endLineNumber: 800,
+      label: "2000-INIT",
+      type: NodeType.NORMAL,
+    };
+
+    conditionNode.callers.push(startNode.id);
+    nestedConditionNode.callers.push(startNode.id);
+    nestedIfTrueNode.callers.push(startNode.id);
+    elseNode.callers.push(startNode.id);
+    nestedIfFalseNode.callers.push(startNode.id);
+    startNode.callees = [
+      conditionNode.id,
+      nestedConditionNode.id,
+      nestedIfTrueNode.id,
+      elseNode.id,
+      nestedIfFalseNode.id,
+      endNode.id,
+    ];
+    endNode.callers.push(startNode.id);
+    cfg.nodes = [
+      startNode,
+      conditionNode,
+      nestedConditionNode,
+      nestedIfTrueNode,
+      elseNode,
+      nestedIfFalseNode,
+      endNode,
+    ];
+
+    const expectedStartNode = getStartNode();
+    const expectedConditionNode: Node = structuredClone(conditionNode);
+    const expectedNestedConditionNode: Node =
+      structuredClone(nestedConditionNode);
+    const expectedNestedIfTrueNode: Node = structuredClone(nestedIfTrueNode);
+    const expectedNestedIfFalseNode: Node = structuredClone(nestedIfFalseNode);
+    const expectedEndNode = getEndNode();
+    expectedStartNode.callees = [expectedConditionNode.id];
+    expectedConditionNode.callers = [expectedStartNode.id];
+    expectedConditionNode.callees = [expectedNestedConditionNode.id];
+    expectedNestedConditionNode.callers = [expectedConditionNode.id];
+    expectedNestedConditionNode.callees = [
+      expectedNestedIfTrueNode.id,
+      expectedNestedIfFalseNode.id,
+    ];
+    expectedNestedIfTrueNode.callers = [expectedNestedConditionNode.id];
+    expectedNestedIfTrueNode.callees = [expectedEndNode.id];
+    expectedNestedIfFalseNode.callers = [expectedNestedConditionNode.id];
+    expectedNestedIfFalseNode.callees = [expectedEndNode.id];
+    expectedEndNode.callers = [
+      expectedNestedIfTrueNode.id,
+      expectedNestedIfFalseNode.id,
+    ];
+
+    cfg.createDisplayNodes();
+
+    const actualStartNode = cfg.displayNodes[0];
+    const actualConditionNode = cfg.displayNodes[1];
+    const actualNestedConditionNode = cfg.displayNodes[2];
+    const actualNestedIfTrueNode = cfg.displayNodes[3];
+    const actualNestedIfFalseNode = cfg.displayNodes[4];
+    const actualEndNode = cfg.displayNodes[5];
+
+    expect(actualStartNode).to.deep.equal(expectedStartNode);
+    expect(actualConditionNode).to.deep.equal(expectedConditionNode);
+    expect(actualNestedConditionNode).to.deep.equal(actualNestedConditionNode);
+    expect(actualNestedIfTrueNode).to.deep.equal(actualNestedIfTrueNode);
+    expect(actualNestedIfFalseNode).to.deep.equal(actualNestedIfFalseNode);
+    expect(actualEndNode).to.deep.equal(expectedEndNode);
+  });
 
   // TODO: test perform end node should point back to perform node
 

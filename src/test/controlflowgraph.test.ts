@@ -604,7 +604,7 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  test("display nodes generated correctly for IF", function () {
+  test("display nodes generated correctly for condition node having callee but no elseNode", function () {
     const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
     const conditionNode = formNode(
       "200",
@@ -666,11 +666,11 @@ suite("Tests for Control Flow Graph", () => {
   // --scenario 1: if have normal node, no else
   // --scenario 2: if have normal node, have else, no normal node
   // --scenario 3: if have normal node, have else, have normal node
-  // scenario 4: if don't have normal node, no else
-  // scenario 5: if don't have normal node, have else, no normal node
+  // --scenario 4: if don't have normal node, no else
+  // --scenario 5: if don't have normal node, have else, no normal node
   // scenario 6: if don't have normal node, have else, have normal node
 
-  test("display nodes generated correctly for IF-ELSE but no callees after elseNode", function () {
+  test("display nodes generated correctly for IF-ELSE but no callee after elseNode", function () {
     const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
     const conditionNode = formNode(
       "200",
@@ -729,7 +729,7 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  test("display nodes generated correctly for IF-ELSE but HAS callees after elseNode", function () {
+  test("display nodes generated correctly for IF-ELSE but HAS callees before and after elseNode", function () {
     const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
     const conditionNode = formNode(
       "200",
@@ -806,275 +806,67 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  test("display nodes generated correctly for IF-ELIF-ELSE", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
+  test("display nodes generated correctly for IF-ELSE but only HAS callees after elseNode", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const conditionNode = formNode(
+      "200",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      200,
+      300
+    );
+    const normalNode = formNode(
+      "501",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      501,
+      600
+    );
+    const elseNode = formNode("450", "ELSE", NodeType.CONDITION_ELSE, 450, 500);
+    const normalNodeAfterElse = formNode(
+      "601",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      601,
+      700
+    );
 
-    const conditionNodeLabel = "IF OFFICIAL-RATE EQUALS ZEROES";
-    const conditionNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 400,
-      endLineNumber: 850,
-      label: conditionNodeLabel,
-      type: NodeType.CONDITION,
-    };
-
-    const ifTrueNode: Node = {
-      id: "401",
-      callers: [],
-      callees: [],
-      startLineNumber: 401,
-      endLineNumber: 500,
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    const elseNode1: Node = {
-      id: "501",
-      callers: [],
-      callees: [],
-      startLineNumber: 501,
-      endLineNumber: 700,
-      label: "ELSE",
-      type: NodeType.CONDITION_ELSE,
-    };
-
-    const conditionNode2: Node = {
-      id: "502",
-      callers: [],
-      callees: [],
-      startLineNumber: 502,
-      endLineNumber: 600,
-      label: conditionNodeLabel,
-      type: NodeType.NORMAL,
-    };
-
-    const elseIfTrueNode: Node = {
-      id: "503",
-      callers: [],
-      callees: [],
-      startLineNumber: 503,
-      endLineNumber: 600,
-      label: "2000-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    const elseNode2: Node = {
-      id: "601",
-      callers: [],
-      callees: [],
-      startLineNumber: 601,
-      endLineNumber: 800,
-      label: "ELSE",
-      type: NodeType.CONDITION_ELSE,
-    };
-
-    const elseIfFalseNode: Node = {
-      id: "602",
-      callers: [],
-      callees: [],
-      startLineNumber: 602,
-      endLineNumber: 800,
-      label: "3000-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    conditionNode.callers.push(startNode.id);
-    ifTrueNode.callers.push(startNode.id);
-    elseNode1.callers.push(startNode.id);
-    conditionNode2.callers.push(startNode.id);
-    elseIfTrueNode.callers.push(startNode.id);
-    elseNode2.callers.push(startNode.id);
-    elseIfFalseNode.callers.push(startNode.id);
-    startNode.callees = [
-      conditionNode.id,
-      ifTrueNode.id,
-      elseNode1.id,
-      conditionNode2.id,
-      elseIfTrueNode.id,
-      elseNode2.id,
-      elseIfFalseNode.id,
-      endNode.id,
-    ];
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [
+    setCallerCallee(startNode, conditionNode);
+    setCallerCallee(startNode, normalNode);
+    setCallerCallee(conditionNode, elseNode);
+    setCallerCallee(conditionNode, normalNodeAfterElse);
+    cfg.addRawNodes([
       startNode,
       conditionNode,
-      ifTrueNode,
-      elseNode1,
-      conditionNode2,
-      elseIfTrueNode,
-      elseNode2,
-      elseIfFalseNode,
-      endNode,
-    ];
-
-    const expectedStartNode = getStartNode();
-    const expectedConditionNode: Node = structuredClone(conditionNode);
-    const expectedIfTrueNode: Node = structuredClone(ifTrueNode);
-    const expectedConditionNode2: Node = structuredClone(conditionNode2);
-    const expectedElseIfTrueNode: Node = structuredClone(elseIfTrueNode);
-    const expectedElseIfFalseNode: Node = structuredClone(elseIfFalseNode);
-    const expectedEndNode = getEndNode();
-    expectedStartNode.callees = [expectedConditionNode.id];
-    expectedConditionNode.callers = [expectedStartNode.id];
-    expectedConditionNode.callees = [expectedIfTrueNode.id, conditionNode2.id];
-    expectedIfTrueNode.callers = [expectedConditionNode.id];
-    expectedIfTrueNode.callees = [expectedEndNode.id];
-    expectedConditionNode2.callers = [expectedConditionNode.id];
-    expectedConditionNode2.callees = [
-      expectedElseIfTrueNode.id,
-      expectedElseIfFalseNode.id,
-    ];
-    expectedElseIfTrueNode.callers = [expectedConditionNode2.id];
-    expectedElseIfTrueNode.callees = [expectedEndNode.id];
-    expectedElseIfFalseNode.callers = [expectedConditionNode2.id];
-    expectedElseIfFalseNode.callees = [expectedEndNode.id];
-    expectedEndNode.callers = [
-      expectedIfTrueNode.id,
-      expectedElseIfTrueNode.id,
-      expectedElseIfFalseNode.id,
-    ];
-
-    cfg.createDisplayNodes();
-
-    const actualStartNode = cfg.displayNodes[0];
-    const actualConditionNode = cfg.displayNodes[1];
-    const actualIfTrueNode = cfg.displayNodes[2];
-    const actualConditionNode2 = cfg.displayNodes[3];
-    const actualElseIfTrueNode = cfg.displayNodes[4];
-    const actualElseIfFalseNode = cfg.displayNodes[5];
-    const actualEndNode = cfg.displayNodes[6];
-
-    expect(actualStartNode).to.deep.equal(expectedStartNode);
-    expect(actualConditionNode).to.deep.equal(expectedConditionNode);
-    expect(actualIfTrueNode).to.deep.equal(actualIfTrueNode);
-    expect(actualConditionNode2).to.deep.equal(expectedConditionNode2);
-    expect(actualElseIfTrueNode).to.deep.equal(expectedElseIfTrueNode);
-    expect(actualElseIfFalseNode).to.deep.equal(expectedElseIfFalseNode);
-    expect(actualEndNode).to.deep.equal(expectedEndNode);
-  });
-
-  test("display nodes generated correctly for nested IF-ELSE", function () {
-    const startNode = getStartNode();
-    const endNode = getEndNode();
-
-    const conditionNodeLabel = "IF OFFICIAL-RATE EQUALS ZEROES";
-    const conditionNode: Node = {
-      id: "400",
-      callers: [],
-      callees: [],
-      startLineNumber: 400,
-      endLineNumber: 850,
-      label: conditionNodeLabel,
-      type: NodeType.CONDITION,
-    };
-
-    const nestedConditionNode: Node = {
-      id: "500",
-      callers: [],
-      callees: [],
-      startLineNumber: 500,
-      endLineNumber: 800,
-      label: conditionNodeLabel,
-      type: NodeType.CONDITION,
-    };
-
-    const nestedIfTrueNode: Node = {
-      id: "600",
-      callers: [],
-      callees: [],
-      startLineNumber: 600,
-      endLineNumber: 700,
-      label: "1000-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    const elseNode: Node = {
-      id: "701",
-      callers: [],
-      callees: [],
-      startLineNumber: 701,
-      endLineNumber: 800,
-      label: "ELSE",
-      type: NodeType.CONDITION_ELSE,
-    };
-
-    const nestedIfFalseNode: Node = {
-      id: "702",
-      callers: [],
-      callees: [],
-      startLineNumber: 702,
-      endLineNumber: 800,
-      label: "2000-INIT",
-      type: NodeType.NORMAL,
-    };
-
-    conditionNode.callers.push(startNode.id);
-    nestedConditionNode.callers.push(startNode.id);
-    nestedIfTrueNode.callers.push(startNode.id);
-    elseNode.callers.push(startNode.id);
-    nestedIfFalseNode.callers.push(startNode.id);
-    startNode.callees = [
-      conditionNode.id,
-      nestedConditionNode.id,
-      nestedIfTrueNode.id,
-      elseNode.id,
-      nestedIfFalseNode.id,
-      endNode.id,
-    ];
-    endNode.callers.push(startNode.id);
-    cfg.nodes = [
-      startNode,
-      conditionNode,
-      nestedConditionNode,
-      nestedIfTrueNode,
       elseNode,
-      nestedIfFalseNode,
-      endNode,
-    ];
+      normalNodeAfterElse,
+      normalNode,
+    ]);
 
-    const expectedStartNode = getStartNode();
-    const expectedConditionNode: Node = structuredClone(conditionNode);
-    const expectedNestedConditionNode: Node =
-      structuredClone(nestedConditionNode);
-    const expectedNestedIfTrueNode: Node = structuredClone(nestedIfTrueNode);
-    const expectedNestedIfFalseNode: Node = structuredClone(nestedIfFalseNode);
-    const expectedEndNode = getEndNode();
-    expectedStartNode.callees = [expectedConditionNode.id];
-    expectedConditionNode.callers = [expectedStartNode.id];
-    expectedConditionNode.callees = [expectedNestedConditionNode.id];
-    expectedNestedConditionNode.callers = [expectedConditionNode.id];
-    expectedNestedConditionNode.callees = [
-      expectedNestedIfTrueNode.id,
-      expectedNestedIfFalseNode.id,
-    ];
-    expectedNestedIfTrueNode.callers = [expectedNestedConditionNode.id];
-    expectedNestedIfTrueNode.callees = [expectedEndNode.id];
-    expectedNestedIfFalseNode.callers = [expectedNestedConditionNode.id];
-    expectedNestedIfFalseNode.callees = [expectedEndNode.id];
-    expectedEndNode.callers = [
-      expectedNestedIfTrueNode.id,
-      expectedNestedIfFalseNode.id,
-    ];
+    const expectedStartNode = structuredClone(startNode);
+    const expectedConditionNode = structuredClone(conditionNode);
+    const expectedNormalNode = structuredClone(normalNode);
+    const expectedNormalNodeAfterElse = structuredClone(normalNodeAfterElse);
+    expectedStartNode.callees = [];
+    expectedConditionNode.callers = [];
+    expectedConditionNode.callees = [];
+    expectedNormalNodeAfterElse.callers = [];
+    expectedNormalNodeAfterElse.callees = [];
+    expectedNormalNode.callers = [];
+    expectedNormalNode.callees = [];
+    setCallerCallee(expectedStartNode, expectedConditionNode);
+    setCallerCallee(expectedConditionNode, expectedNormalNode);
+    setCallerCallee(expectedConditionNode, expectedNormalNodeAfterElse);
+    setCallerCallee(expectedNormalNodeAfterElse, expectedNormalNode);
 
-    cfg.createDisplayNodes();
+    cfg.generateDisplayNodes();
 
-    const actualStartNode = cfg.displayNodes[0];
-    const actualConditionNode = cfg.displayNodes[1];
-    const actualNestedConditionNode = cfg.displayNodes[2];
-    const actualNestedIfTrueNode = cfg.displayNodes[3];
-    const actualNestedIfFalseNode = cfg.displayNodes[4];
-    const actualEndNode = cfg.displayNodes[5];
-
-    expect(actualStartNode).to.deep.equal(expectedStartNode);
-    expect(actualConditionNode).to.deep.equal(expectedConditionNode);
-    expect(actualNestedConditionNode).to.deep.equal(actualNestedConditionNode);
-    expect(actualNestedIfTrueNode).to.deep.equal(actualNestedIfTrueNode);
-    expect(actualNestedIfFalseNode).to.deep.equal(actualNestedIfFalseNode);
-    expect(actualEndNode).to.deep.equal(expectedEndNode);
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
+      expectedConditionNode,
+      expectedNormalNodeAfterElse,
+      expectedNormalNode,
+    ]);
   });
 
   // TODO: test perform end node should point back to perform node

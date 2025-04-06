@@ -815,13 +815,6 @@ suite("Tests for Control Flow Graph", () => {
       200,
       300
     );
-    const normalNode = formNode(
-      "501",
-      "2000-PROCESS",
-      NodeType.NORMAL,
-      501,
-      600
-    );
     const elseNode = formNode("450", "ELSE", NodeType.CONDITION_ELSE, 450, 500);
     const normalNodeAfterElse = formNode(
       "601",
@@ -830,9 +823,16 @@ suite("Tests for Control Flow Graph", () => {
       601,
       700
     );
+    const normalNodeAfterEndIf = formNode(
+      "501",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      501,
+      600
+    );
 
     setCallerCallee(startNode, conditionNode);
-    setCallerCallee(startNode, normalNode);
+    setCallerCallee(startNode, normalNodeAfterEndIf);
     setCallerCallee(conditionNode, elseNode);
     setCallerCallee(conditionNode, normalNodeAfterElse);
     cfg.addRawNodes([
@@ -840,24 +840,24 @@ suite("Tests for Control Flow Graph", () => {
       conditionNode,
       elseNode,
       normalNodeAfterElse,
-      normalNode,
+      normalNodeAfterEndIf,
     ]);
 
     const expectedStartNode = structuredClone(startNode);
     const expectedConditionNode = structuredClone(conditionNode);
-    const expectedNormalNode = structuredClone(normalNode);
     const expectedNormalNodeAfterElse = structuredClone(normalNodeAfterElse);
+    const expectedNormalNodeAfterEndIf = structuredClone(normalNodeAfterEndIf);
     expectedStartNode.callees = [];
     expectedConditionNode.callers = [];
     expectedConditionNode.callees = [];
     expectedNormalNodeAfterElse.callers = [];
     expectedNormalNodeAfterElse.callees = [];
-    expectedNormalNode.callers = [];
-    expectedNormalNode.callees = [];
+    expectedNormalNodeAfterEndIf.callers = [];
+    expectedNormalNodeAfterEndIf.callees = [];
     setCallerCallee(expectedStartNode, expectedConditionNode);
-    setCallerCallee(expectedConditionNode, expectedNormalNode);
+    setCallerCallee(expectedConditionNode, expectedNormalNodeAfterEndIf);
     setCallerCallee(expectedConditionNode, expectedNormalNodeAfterElse);
-    setCallerCallee(expectedNormalNodeAfterElse, expectedNormalNode);
+    setCallerCallee(expectedNormalNodeAfterElse, expectedNormalNodeAfterEndIf);
 
     cfg.generateDisplayNodes();
 
@@ -865,7 +865,207 @@ suite("Tests for Control Flow Graph", () => {
       expectedStartNode,
       expectedConditionNode,
       expectedNormalNodeAfterElse,
-      expectedNormalNode,
+      expectedNormalNodeAfterEndIf,
+    ]);
+  });
+
+  test("duplicated display nodes generated correctly for IF-ELSE but only HAS callees after elseNode", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const callerNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 350);
+    const nodeWithMultipleCallers = formNode(
+      "400",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      400,
+      450
+    );
+    const conditionNode = formNode(
+      "500",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      500,
+      600
+    );
+    const elseNode = formNode("550", "ELSE", NodeType.CONDITION_ELSE, 550, 600);
+    const normalNodeAfterElse = formNode(
+      "701",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      701,
+      800
+    );
+
+    const normalNodeAfterEndIf = formNode(
+      "601",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      601,
+      700
+    );
+
+    setCallerCallee(startNode, nodeWithMultipleCallers);
+    setCallerCallee(startNode, callerNode);
+    setCallerCallee(callerNode, nodeWithMultipleCallers);
+    setCallerCallee(callerNode, normalNodeAfterEndIf);
+    setCallerCallee(nodeWithMultipleCallers, conditionNode);
+    setCallerCallee(conditionNode, elseNode);
+    setCallerCallee(conditionNode, normalNodeAfterElse);
+    cfg.addRawNodes([
+      startNode,
+      callerNode,
+      nodeWithMultipleCallers,
+      conditionNode,
+      elseNode,
+      normalNodeAfterElse,
+      normalNodeAfterEndIf,
+    ]);
+
+    const expectedStartNode = structuredClone(startNode);
+    const expectedCallerNode = structuredClone(callerNode);
+    const expectedNodeWithMultipleCallers_1 = structuredClone(
+      nodeWithMultipleCallers
+    );
+    expectedNodeWithMultipleCallers_1.id = nodeWithMultipleCallers.id + "_1";
+    const expectedNodeWithMultipleCallers_2 = structuredClone(
+      nodeWithMultipleCallers
+    );
+    expectedNodeWithMultipleCallers_2.id = nodeWithMultipleCallers.id + "_2";
+    const expectedConditionNode_1 = structuredClone(conditionNode);
+    expectedConditionNode_1.id = conditionNode.id + "_1";
+    const expectedConditionNode_2 = structuredClone(conditionNode);
+    expectedConditionNode_2.id = conditionNode.id + "_2";
+    const expectedNormalNodeAfterElse_1 = structuredClone(normalNodeAfterElse);
+    expectedNormalNodeAfterElse_1.id = normalNodeAfterElse.id + "_1";
+    const expectedNormalNodeAfterElse_2 = structuredClone(normalNodeAfterElse);
+    expectedNormalNodeAfterElse_2.id = normalNodeAfterElse.id + "_2";
+    const expectedNormalNodeAfterEndIf = structuredClone(normalNodeAfterEndIf);
+    expectedStartNode.callees = [];
+    expectedCallerNode.callers = [];
+    expectedCallerNode.callees = [];
+    expectedNodeWithMultipleCallers_1.callers = [];
+    expectedNodeWithMultipleCallers_1.callees = [];
+    expectedNodeWithMultipleCallers_2.callers = [];
+    expectedNodeWithMultipleCallers_2.callees = [];
+    expectedConditionNode_1.callers = [];
+    expectedConditionNode_1.callees = [];
+    expectedConditionNode_2.callers = [];
+    expectedConditionNode_2.callees = [];
+    expectedNormalNodeAfterElse_1.callers = [];
+    expectedNormalNodeAfterElse_1.callees = [];
+    expectedNormalNodeAfterElse_2.callers = [];
+    expectedNormalNodeAfterElse_2.callees = [];
+    expectedNormalNodeAfterEndIf.callers = [];
+    expectedNormalNodeAfterEndIf.callees = [];
+    setCallerCallee(expectedStartNode, expectedNodeWithMultipleCallers_1);
+    setCallerCallee(expectedNodeWithMultipleCallers_1, expectedConditionNode_1);
+    setCallerCallee(expectedConditionNode_1, expectedCallerNode);
+    setCallerCallee(expectedConditionNode_1, expectedNormalNodeAfterElse_1);
+    setCallerCallee(expectedNormalNodeAfterElse_1, expectedCallerNode);
+    setCallerCallee(expectedCallerNode, expectedNodeWithMultipleCallers_2);
+    setCallerCallee(expectedNodeWithMultipleCallers_2, expectedConditionNode_2);
+    setCallerCallee(expectedConditionNode_2, expectedNormalNodeAfterEndIf);
+    setCallerCallee(expectedConditionNode_2, expectedNormalNodeAfterElse_2);
+    setCallerCallee(
+      expectedNormalNodeAfterElse_2,
+      expectedNormalNodeAfterEndIf
+    );
+
+    cfg.generateDisplayNodes();
+
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
+      expectedNodeWithMultipleCallers_1,
+      expectedConditionNode_1,
+      expectedNormalNodeAfterElse_1,
+      expectedCallerNode,
+      expectedNodeWithMultipleCallers_2,
+      expectedConditionNode_2,
+      expectedNormalNodeAfterElse_2,
+      expectedNormalNodeAfterEndIf,
+    ]);
+  });
+
+  test("duplicated node (last callee of condition node that has multiple callers) generated correctly for IF-ELSE but only HAS callees after elseNode", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const callerNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 350);
+    const conditionNode = formNode(
+      "500",
+      "IF OFFICIAL-RATE EQUALS ZEROES",
+      NodeType.CONDITION,
+      500,
+      600
+    );
+    const elseNode = formNode("550", "ELSE", NodeType.CONDITION_ELSE, 550, 600);
+    const normalNodeAfterElse = formNode(
+      "701",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      701,
+      800
+    );
+
+    const normalNodeAfterEndIf = formNode(
+      "601",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      601,
+      700
+    );
+
+    setCallerCallee(startNode, normalNodeAfterElse);
+    setCallerCallee(startNode, callerNode);
+    setCallerCallee(callerNode, conditionNode);
+    setCallerCallee(callerNode, normalNodeAfterEndIf);
+    setCallerCallee(conditionNode, elseNode);
+    setCallerCallee(conditionNode, normalNodeAfterElse);
+    cfg.addRawNodes([
+      startNode,
+      callerNode,
+      conditionNode,
+      elseNode,
+      normalNodeAfterElse,
+      normalNodeAfterEndIf,
+    ]);
+
+    const expectedStartNode = structuredClone(startNode);
+    const expectedCallerNode = structuredClone(callerNode);
+    const expectedConditionNode = structuredClone(conditionNode);
+    const expectedNormalNodeAfterElse_1 = structuredClone(normalNodeAfterElse);
+    expectedNormalNodeAfterElse_1.id = normalNodeAfterElse.id + "_1";
+    const expectedNormalNodeAfterElse_2 = structuredClone(normalNodeAfterElse);
+    expectedNormalNodeAfterElse_2.id = normalNodeAfterElse.id + "_2";
+    const expectedNormalNodeAfterEndIf = structuredClone(normalNodeAfterEndIf);
+    expectedStartNode.callees = [];
+    expectedCallerNode.callers = [];
+    expectedCallerNode.callees = [];
+    expectedConditionNode.callers = [];
+    expectedConditionNode.callees = [];
+    expectedNormalNodeAfterElse_1.callers = [];
+    expectedNormalNodeAfterElse_1.callees = [];
+    expectedNormalNodeAfterElse_2.callers = [];
+    expectedNormalNodeAfterElse_2.callees = [];
+    expectedNormalNodeAfterEndIf.callers = [];
+    expectedNormalNodeAfterEndIf.callees = [];
+
+    setCallerCallee(expectedStartNode, expectedNormalNodeAfterElse_1);
+    setCallerCallee(expectedNormalNodeAfterElse_1, expectedCallerNode);
+    setCallerCallee(expectedCallerNode, expectedConditionNode);
+    setCallerCallee(expectedConditionNode, expectedNormalNodeAfterEndIf);
+    setCallerCallee(expectedConditionNode, expectedNormalNodeAfterElse_2);
+    setCallerCallee(
+      expectedNormalNodeAfterElse_2,
+      expectedNormalNodeAfterEndIf
+    );
+
+    cfg.generateDisplayNodes();
+
+    expect(cfg.getDisplayNodes()).to.be.deep.equal([
+      expectedStartNode,
+      expectedNormalNodeAfterElse_1,
+      expectedCallerNode,
+      expectedConditionNode,
+      expectedNormalNodeAfterElse_2,
+      expectedNormalNodeAfterEndIf,
     ]);
   });
 

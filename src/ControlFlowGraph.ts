@@ -192,6 +192,33 @@ export class ControlFlowGraph {
     this.removeRawNodes(removedNodes);
   }
 
+  private getRawId(nodeId: string): string {
+    if (this.checkIsDup(nodeId)) {
+      return nodeId.split("_")[0];
+    }
+
+    return nodeId;
+  }
+
+  private checkIsDup(nodeId: string): boolean {
+    return nodeId.split("_").length > 1;
+  }
+
+  private getDupIdBasedOnCaller(nodeId: string, callerId: string): string {
+    if (this.checkIsDup(callerId)) {
+      const dupIndex = callerId.split("_")[1];
+      return nodeId + "_" + dupIndex;
+    }
+
+    const rawNode = this.getRawNodes().find((n) => n.id === nodeId);
+    if (rawNode && rawNode.callers.length > 1) {
+      const dupIndex = rawNode.callers.indexOf(callerId) + 1;
+      return nodeId + "_" + dupIndex;
+    }
+
+    return "";
+  }
+
   public generateDisplayNodes() {
     this.processRawNodesForDisplay(this.getRawNodes());
     const startNode = this.getRawNodes()[0];
@@ -212,16 +239,24 @@ export class ControlFlowGraph {
         // search for diverging Node
         const elseNode = this.getRawNodes().find(
           (n) =>
-            n.callers.includes(condNode.id) &&
+            n.callers.includes(this.getRawId(condNode.id)) &&
             n.type === NodeType.CONDITION_ELSE
         );
         const elseNodeIdx = this.getDisplayNodes().findIndex(
-          (n) => n.id === elseNode?.id
+          (n) =>
+            n.id === elseNode?.id ||
+            n.id === this.getDupIdBasedOnCaller("" + elseNode?.id, condNode.id)
         );
 
         let newCallerForConvergingNode: Node = condNode;
         let noNodeBetweenIfAndElse = false;
         let hasNodeBetweenElseAndEndIf = false;
+        const rawCondNodeCallees: string[] = [];
+        rawCondNodeCallees.push(
+          ...(this.getRawNodes().find(
+            (n) => n.id === this.getRawId(condNode.id)
+          )?.callees ?? [])
+        );
         const hasElseNode = elseNodeIdx !== -1;
         if (hasElseNode) {
           const nodeBeforeElse = this.getDisplayNodes()[elseNodeIdx - 1];
@@ -237,8 +272,8 @@ export class ControlFlowGraph {
           nodeBeforeElse.callees.pop();
           nodeAfterElse.callers.pop();
           noNodeBetweenIfAndElse = nodeBeforeElse.id === condNode.id;
-          hasNodeBetweenElseAndEndIf = this.getRawNodes().some(
-            (n) => n.id === condNode.id && n.callees.includes(nodeAfterElse.id)
+          hasNodeBetweenElseAndEndIf = rawCondNodeCallees.includes(
+            this.getRawId(nodeAfterElse.id)
           );
 
           if (hasNodeBetweenElseAndEndIf) {
@@ -252,22 +287,25 @@ export class ControlFlowGraph {
           }
         }
 
-        const conditionNodeCallerId = condNode.callers[0];
         let convergingNode: Node | undefined;
         // find converging node
-        this.getRawNodes().forEach((n) => {
-          if (convergingNode) {
-            return;
-          }
-          if (n.id === conditionNodeCallerId) {
-            const idxOfConvergingNode =
-              n.callees.findIndex((c) => c === condNode.id) + 1;
-            const convergingNodeId = n.callees[idxOfConvergingNode];
-            convergingNode = this.getDisplayNodes().find(
-              (n) => n.id === convergingNodeId
-            );
-          }
-        });
+        let lastRawCondNodeCallee =
+          rawCondNodeCallees[rawCondNodeCallees.length - 1];
+        if (hasElseNode) {
+          lastRawCondNodeCallee =
+            "" + rawCondNodeCallees.filter((n) => n !== elseNode?.id).pop();
+        }
+        const convergingNodeIdx =
+          this.getDisplayNodes().findIndex(
+            (n) =>
+              n.id === lastRawCondNodeCallee ||
+              n.id ===
+                this.getDupIdBasedOnCaller(
+                  "" + lastRawCondNodeCallee,
+                  condNode.id
+                )
+          ) + 1;
+        convergingNode = this.getDisplayNodes()[convergingNodeIdx];
 
         if (convergingNode) {
           newCallerForConvergingNode.callees.push(convergingNode.id);
@@ -339,19 +377,21 @@ export class ControlFlowGraph {
         const isCallingItself = calleeNode.callers[0].startsWith(
           calleeNode.id.split("_")[0] + "_"
         );
-        if (hasMultipleCaller && !isCallingItself) {
-          callerNode = this.createDisplayNodesForCallees(
-            calleeNode,
-            [...calleeNode.callees],
-            true
-          );
-          callerNodeIsDup = false;
-        } else if (calleeNode.callees.length > 0 && !isCallingItself) {
-          callerNode = this.createDisplayNodesForCallees(
-            calleeNode,
-            [...calleeNode.callees],
-            false
-          );
+        if (calleeNode.callees.length > 0 && !isCallingItself) {
+          if (callerNodeIsDup || hasMultipleCaller) {
+            callerNode = this.createDisplayNodesForCallees(
+              calleeNode,
+              [...calleeNode.callees],
+              true
+            );
+            callerNodeIsDup = false;
+          } else {
+            callerNode = this.createDisplayNodesForCallees(
+              calleeNode,
+              [...calleeNode.callees],
+              false
+            );
+          }
         } else {
           callerNode = calleeNode;
         }

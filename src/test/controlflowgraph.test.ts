@@ -32,6 +32,15 @@ suite("Tests for Control Flow Graph", () => {
     };
   }
 
+  function formEdge(source: string, target: string, isPolyline: boolean) {
+    return {
+      id: source + "-" + target,
+      source: source,
+      target: target,
+      isPolyline: isPolyline,
+    };
+  }
+
   function setCallerCallee(caller: Node, callee: Node) {
     caller.callees.push(callee.id);
     callee.callers.push(caller.id);
@@ -1066,6 +1075,138 @@ suite("Tests for Control Flow Graph", () => {
       expectedConditionNode,
       expectedNormalNodeAfterElse_2,
       expectedNormalNodeAfterEndIf,
+    ]);
+  });
+
+  test("the edges generated correctly for display nodes that has no condition node and loop node", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const callerNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 350);
+    const calleeNode = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
+
+    setCallerCallee(startNode, callerNode);
+    setCallerCallee(callerNode, calleeNode);
+    cfg.addRawNodes([startNode, callerNode, calleeNode]);
+
+    cfg.generateDisplayNodes();
+    cfg.generateEdges();
+
+    const expectedE1 = formEdge(startNode.id, callerNode.id, false);
+    const expectedE2 = formEdge(callerNode.id, calleeNode.id, false);
+
+    expect(cfg.getEdges()).to.be.deep.equal([expectedE1, expectedE2]);
+  });
+
+  test("edges generated correctly for node with multiple callers and has callee", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const callerNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400);
+    const nodeWithMultipleCallers = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
+    const calleeNode = formNode(
+      "700",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      700,
+      800
+    );
+
+    setCallerCallee(startNode, nodeWithMultipleCallers);
+    setCallerCallee(startNode, callerNode);
+    setCallerCallee(callerNode, nodeWithMultipleCallers);
+    setCallerCallee(nodeWithMultipleCallers, calleeNode);
+    cfg.addRawNodes([
+      startNode,
+      callerNode,
+      nodeWithMultipleCallers,
+      calleeNode,
+    ]);
+
+    cfg.generateDisplayNodes();
+    cfg.generateEdges();
+
+    const dupNodeId_1 = nodeWithMultipleCallers.id + "_1";
+    const dupNodeId_2 = nodeWithMultipleCallers.id + "_2";
+    const dupCalleeNodeId_1 = calleeNode.id + "_1";
+    const dupCalleeNodeId_2 = calleeNode.id + "_2";
+    const expectedE1 = formEdge(startNode.id, dupNodeId_1, false);
+    const expectedE2 = formEdge(dupNodeId_1, dupCalleeNodeId_1, false);
+    const expectedE3 = formEdge(dupCalleeNodeId_1, callerNode.id, false);
+    const expectedE4 = formEdge(callerNode.id, dupNodeId_2, false);
+    const expectedE5 = formEdge(dupNodeId_2, dupCalleeNodeId_2, false);
+
+    expect(cfg.getEdges()).to.be.deep.equal([
+      expectedE1,
+      expectedE2,
+      expectedE3,
+      expectedE4,
+      expectedE5,
+    ]);
+  });
+
+  test("edges generated correctly for last loop node callee and loop node", function () {
+    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const loopNode = formNode("300", "1000-LOOP", NodeType.LOOP, 300, 400);
+    const calleeNode = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
+
+    const lastCalleeNode = formNode(
+      "700",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      700,
+      800
+    );
+
+    const afterLoopNode = formNode(
+      "900",
+      "4000-PROCESS",
+      NodeType.NORMAL,
+      900,
+      1000
+    );
+
+    setCallerCallee(startNode, loopNode);
+    setCallerCallee(loopNode, calleeNode);
+    setCallerCallee(loopNode, lastCalleeNode);
+    setCallerCallee(startNode, afterLoopNode);
+    cfg.addRawNodes([
+      startNode,
+      loopNode,
+      calleeNode,
+      lastCalleeNode,
+      afterLoopNode,
+    ]);
+
+    cfg.generateDisplayNodes();
+    cfg.generateEdges();
+
+    const expectedE1 = formEdge(startNode.id, loopNode.id, false);
+    const expectedE2 = formEdge(loopNode.id, calleeNode.id, false);
+    const expectedE3 = formEdge(calleeNode.id, lastCalleeNode.id, false);
+    const expectedE4 = formEdge(lastCalleeNode.id, loopNode.id, true);
+    const expectedE5 = formEdge(lastCalleeNode.id, afterLoopNode.id, false);
+
+    expect(cfg.getEdges()).to.be.deep.equal([
+      expectedE1,
+      expectedE2,
+      expectedE3,
+      expectedE4,
+      expectedE5,
     ]);
   });
 

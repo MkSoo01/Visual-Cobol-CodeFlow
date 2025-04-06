@@ -30,10 +30,16 @@ export interface Edge {
   isPolyline: boolean;
 }
 
+export interface Route {
+  id: string;
+  nodes: string[];
+}
+
 export class ControlFlowGraph {
   private rawNodes: Node[] = [];
   private displayNodes: Node[] = [];
   private edges: Edge[] = [];
+  private routes: Route[] = [];
 
   public getDisplayNodes(): Node[] {
     return [...this.displayNodes];
@@ -87,6 +93,18 @@ export class ControlFlowGraph {
     return [...this.edges];
   }
 
+  private getRoute(): Route {
+    if (this.routes.length == 0) {
+      const route: Route = {
+        id: "route1",
+        nodes: [],
+      };
+      this.routes.push(route);
+    }
+
+    return this.routes[this.routes.length - 1];
+  }
+
   public addEdge(edge: Edge) {
     if (edge) {
       const isValidSourceNode =
@@ -95,6 +113,7 @@ export class ControlFlowGraph {
         this.displayNodes.find((n) => n.id === edge.target) !== undefined;
       if (isValidSourceNode && isValidTargetNode) {
         this.edges.push(edge);
+        this.getRoute().nodes.push(edge.id);
       }
     }
   }
@@ -116,6 +135,7 @@ export class ControlFlowGraph {
 
     this.addRawNodes(visitor.getNodes());
     this.generateDisplayNodes();
+    this.generateEdges();
   }
 
   private findCalleesOfRemovedNode(
@@ -190,6 +210,65 @@ export class ControlFlowGraph {
     });
 
     this.removeRawNodes(removedNodes);
+  }
+
+  private createDisplayNodesForCallees(
+    callerNode: Node,
+    callees: String[],
+    callerNodeIsDup: boolean
+  ): Node {
+    callees.forEach((callee) => {
+      let calleeNode = this.getRawNodes().find((node) => node.id === callee);
+      if (calleeNode) {
+        calleeNode = structuredClone(calleeNode);
+        const hasMultipleCaller = calleeNode.callers.length > 1;
+        if (callerNodeIsDup || hasMultipleCaller) {
+          calleeNode.id = this.createDupNodesId(calleeNode);
+        }
+        calleeNode.callers = [callerNode.id];
+        callerNode.callees = [calleeNode.id];
+        this.addDisplayNode(calleeNode);
+
+        const isCallingItself = calleeNode.callers[0].startsWith(
+          calleeNode.id.split("_")[0] + "_"
+        );
+        if (calleeNode.callees.length > 0 && !isCallingItself) {
+          if (callerNodeIsDup || hasMultipleCaller) {
+            callerNode = this.createDisplayNodesForCallees(
+              calleeNode,
+              [...calleeNode.callees],
+              true
+            );
+            callerNodeIsDup = false;
+          } else {
+            callerNode = this.createDisplayNodesForCallees(
+              calleeNode,
+              [...calleeNode.callees],
+              false
+            );
+          }
+        } else {
+          callerNode = calleeNode;
+        }
+      } else {
+        throw new Error(`Callee ${callee} not found`);
+      }
+    });
+
+    return callerNode;
+  }
+
+  private createDupNodesId(currentNode: Node): string {
+    const dupNodeId =
+      currentNode.id +
+      "_" +
+      (
+        this.getDisplayNodes().filter((node) =>
+          node.id.startsWith(currentNode.id + "_")
+        ).length + 1
+      ).toString();
+
+    return dupNodeId;
   }
 
   private getRawId(nodeId: string): string {
@@ -329,90 +408,28 @@ export class ControlFlowGraph {
     }
   }
 
-  /*
-  A -> B_1 -> C -> B_2 -> D
-  objective
-  - Create a duplicated node for each node with multiple callers.
-  - it should navigate throught the callees of the current node before moving to the next callee of A
-  currentNode: A
-  add currentNode to displayNodes list
-  Loop through callees of currentNode:
-    - If currentNode have multiple callers, create a duplicated node with 
-    the same label and add it to displayNodes, set currentNode
-    to the last duplicated Node (haven't add to displayNodes yet).
-    - get the next node from visitor nodes
-    - set the current node callee to the next node
-    - add the current node to displayNodes
-    - set the next node caller to current node
-    - if next node have callees, recursively call createDisplayNodesFrom
+  public generateEdges() {
+    let latestLoopNodeId: string = "";
+    let lastLoopNodeCallee: string = "";
 
-  push the last node to displayNodes and if it has multple callers
-  call createDupNodes
+    this.getDisplayNodes().forEach((n) => {
+      if (n.id === lastLoopNodeCallee) {
+        this.addEdge(this.formEdge(n.id, latestLoopNodeId, true));
+      }
 
-  createDupNodes need node with multiple caller and its caller
-  - every node need to check if have multiple caller before added to displayNodes
+      if (n.callees.length > 0) {
+        n.callees.forEach((c) => {
+          this.addEdge(this.formEdge(n.id, c, false));
+        });
 
-  node with caller defined can be added to displayNodes
-
-    
-  */
-
-  public createDisplayNodesForCallees(
-    callerNode: Node,
-    callees: String[],
-    callerNodeIsDup: boolean
-  ): Node {
-    callees.forEach((callee) => {
-      let calleeNode = this.getRawNodes().find((node) => node.id === callee);
-      if (calleeNode) {
-        calleeNode = structuredClone(calleeNode);
-        const hasMultipleCaller = calleeNode.callers.length > 1;
-        if (callerNodeIsDup || hasMultipleCaller) {
-          calleeNode.id = this.createDupNodesId(calleeNode);
+        if (n.type === NodeType.LOOP) {
+          latestLoopNodeId = n.id;
+          const loopNodeCallees = this.getRawNodes().find(
+            (r) => r.id === n.id
+          )!.callees;
+          lastLoopNodeCallee = loopNodeCallees[loopNodeCallees.length - 1];
         }
-        calleeNode.callers = [callerNode.id];
-        callerNode.callees = [calleeNode.id];
-        this.addDisplayNode(calleeNode);
-
-        const isCallingItself = calleeNode.callers[0].startsWith(
-          calleeNode.id.split("_")[0] + "_"
-        );
-        if (calleeNode.callees.length > 0 && !isCallingItself) {
-          if (callerNodeIsDup || hasMultipleCaller) {
-            callerNode = this.createDisplayNodesForCallees(
-              calleeNode,
-              [...calleeNode.callees],
-              true
-            );
-            callerNodeIsDup = false;
-          } else {
-            callerNode = this.createDisplayNodesForCallees(
-              calleeNode,
-              [...calleeNode.callees],
-              false
-            );
-          }
-        } else {
-          callerNode = calleeNode;
-        }
-      } else {
-        throw new Error(`Callee ${callee} not found`);
       }
     });
-
-    return callerNode;
-  }
-
-  public createDupNodesId(currentNode: Node): string {
-    const dupNodeId =
-      currentNode.id +
-      "_" +
-      (
-        this.getDisplayNodes().filter((node) =>
-          node.id.startsWith(currentNode.id + "_")
-        ).length + 1
-      ).toString();
-
-    return dupNodeId;
   }
 }

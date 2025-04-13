@@ -79,6 +79,7 @@ export class ControlFlowVisitor
       endLineNumber: endLineNumber,
       callers: [],
       callees: [],
+      flow: "f1",
     };
   }
 
@@ -88,7 +89,6 @@ export class ControlFlowVisitor
       currentCtx &&
       !(
         currentCtx instanceof VisualCobolParser.ParagraphContext ||
-        currentCtx instanceof VisualCobolParser.IfStatementContext ||
         currentCtx instanceof VisualCobolParser.PerformInlineStatementContext
       )
     ) {
@@ -109,7 +109,7 @@ export class ControlFlowVisitor
 
     this.addNode(node);
 
-    if (ctx.paragraphName().text?.startsWith("0000")) {
+    if (ctx.paragraphName().text?.startsWith("0000-MAIN-ROUTINE")) {
       node.type = NodeType.START;
     }
 
@@ -126,47 +126,6 @@ export class ControlFlowVisitor
       caller = ancestor;
       callee = ctx.procedureName(0).text;
       this.addEntryToCallerCalleesMap(caller, callee);
-    }
-
-    this.visitChildren(ctx);
-  }
-
-  visitIfStatement(ctx: VisualCobolParser.IfStatementContext): void {
-    const nodeName =
-      ctx.IF().text + " " + this.getLeafNodeTexts(ctx.condition()).join(" ");
-
-    const conditionNode: Node = this.formNode(
-      ctx.start.line.toString(),
-      nodeName,
-      NodeType.CONDITION,
-      ctx.start.line,
-      ctx.stop ? ctx.stop.line : ctx.start.line
-    );
-
-    this.addNode(conditionNode);
-
-    const ancestor = this.getAncestor(ctx);
-    if (ancestor) {
-      this.addEntryToCallerCalleesMap(ancestor, conditionNode.id);
-    }
-
-    this.visitChildren(ctx);
-  }
-
-  visitIfElse(ctx: VisualCobolParser.IfElseContext): void {
-    const elseNode: Node = this.formNode(
-      ctx.start.line.toString(),
-      ctx.ELSE().text,
-      NodeType.CONDITION_ELSE,
-      ctx.start.line,
-      ctx.stop ? ctx.stop.line : ctx.start.line
-    );
-
-    this.addNode(elseNode);
-
-    const ancestor = this.getAncestor(ctx);
-    if (ancestor) {
-      this.addEntryToCallerCalleesMap(ancestor, elseNode.id);
     }
 
     this.visitChildren(ctx);

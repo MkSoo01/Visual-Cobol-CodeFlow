@@ -7,8 +7,6 @@ import { VisualCobolParser } from "./generated/VisualCobolParser";
 export enum NodeType {
   START = "start",
   END = "end",
-  CONDITION = "condition",
-  CONDITION_ELSE = "conditionELSE",
   LOOP = "loop",
   NORMAL = "normal",
 }
@@ -21,6 +19,9 @@ export interface Node {
   endLineNumber: number;
   callers: string[];
   callees: string[];
+  x?: number;
+  y?: number;
+  flow: string;
 }
 
 export interface Edge {
@@ -28,6 +29,10 @@ export interface Edge {
   source: string;
   target: string;
   isPolyline: boolean;
+  flow: string;
+  isAngled?: boolean;
+  isLoop?: boolean;
+  points?: number[];
 }
 
 export interface Route {
@@ -86,6 +91,7 @@ export class ControlFlowGraph {
       source: source,
       target: target,
       isPolyline: isPolyline,
+      flow: "f1",
     };
   }
 
@@ -94,7 +100,7 @@ export class ControlFlowGraph {
   }
 
   private getRoute(): Route {
-    if (this.routes.length == 0) {
+    if (this.routes.length === 0) {
       const route: Route = {
         id: "route1",
         nodes: [],
@@ -193,7 +199,7 @@ export class ControlFlowGraph {
     );
 
     rawNodes
-      .filter((n) => n.type === NodeType.CONDITION || n.type === NodeType.LOOP)
+      .filter((n) => n.type === NodeType.LOOP)
       .forEach((n) => {
         if (
           n.callees.length === 0 ||
@@ -308,104 +314,6 @@ export class ControlFlowGraph {
       [...startNodeForDisplay.callees],
       false
     );
-
-    const conditionNodesForDisplay = this.getDisplayNodes().filter(
-      (n) => n.type === NodeType.CONDITION
-    );
-
-    if (conditionNodesForDisplay.length > 0) {
-      conditionNodesForDisplay.forEach((condNode) => {
-        // search for diverging Node
-        const elseNode = this.getRawNodes().find(
-          (n) =>
-            n.callers.includes(this.getRawId(condNode.id)) &&
-            n.type === NodeType.CONDITION_ELSE
-        );
-        const elseNodeIdx = this.getDisplayNodes().findIndex(
-          (n) =>
-            n.id === elseNode?.id ||
-            n.id === this.getDupIdBasedOnCaller("" + elseNode?.id, condNode.id)
-        );
-
-        let newCallerForConvergingNode: Node = condNode;
-        let noNodeBetweenIfAndElse = false;
-        let hasNodeBetweenElseAndEndIf = false;
-        const rawCondNodeCallees: string[] = [];
-        rawCondNodeCallees.push(
-          ...(this.getRawNodes().find(
-            (n) => n.id === this.getRawId(condNode.id)
-          )?.callees ?? [])
-        );
-        const hasElseNode = elseNodeIdx !== -1;
-        if (hasElseNode) {
-          const nodeBeforeElse = this.getDisplayNodes()[elseNodeIdx - 1];
-          const nodeAfterElse = this.getDisplayNodes()[elseNodeIdx + 1];
-
-          if (!nodeAfterElse) {
-            return;
-          }
-
-          //elseNode can be removed after identifying the nodeBeforeElse and nodeAfterElse to branch out from condition node
-          this.removeDisplayNodeByIndex(elseNodeIdx);
-          //removing elseNode from the callees of nodeBeforeElse and from the callers of nodeAfterElse
-          nodeBeforeElse.callees.pop();
-          nodeAfterElse.callers.pop();
-          noNodeBetweenIfAndElse = nodeBeforeElse.id === condNode.id;
-          hasNodeBetweenElseAndEndIf = rawCondNodeCallees.includes(
-            this.getRawId(nodeAfterElse.id)
-          );
-
-          if (hasNodeBetweenElseAndEndIf) {
-            newCallerForConvergingNode = nodeBeforeElse;
-            condNode.callees.push(nodeAfterElse.id);
-            nodeAfterElse.callers.push(condNode.id);
-          } else {
-            const nodeAfterEndIf = nodeAfterElse;
-            nodeBeforeElse.callees.push(nodeAfterEndIf.id);
-            nodeAfterEndIf.callers.push(nodeBeforeElse.id);
-          }
-        }
-
-        let convergingNode: Node | undefined;
-        // find converging node
-        let lastRawCondNodeCallee =
-          rawCondNodeCallees[rawCondNodeCallees.length - 1];
-        if (hasElseNode) {
-          lastRawCondNodeCallee =
-            "" + rawCondNodeCallees.filter((n) => n !== elseNode?.id).pop();
-        }
-        const convergingNodeIdx =
-          this.getDisplayNodes().findIndex(
-            (n) =>
-              n.id === lastRawCondNodeCallee ||
-              n.id ===
-                this.getDupIdBasedOnCaller(
-                  "" + lastRawCondNodeCallee,
-                  condNode.id
-                )
-          ) + 1;
-        convergingNode = this.getDisplayNodes()[convergingNodeIdx];
-
-        if (convergingNode) {
-          newCallerForConvergingNode.callees.push(convergingNode.id);
-          convergingNode.callers.push(newCallerForConvergingNode.id);
-
-          if (noNodeBetweenIfAndElse) {
-            // newCallerForConvergingNode is the condition node
-            // codntion node and the first callee of condtionNode will be interpreted as if-true branch
-            // switch the caller position so condtionNode --> convergingNode becomes if-true branch
-            newCallerForConvergingNode.callees.push(
-              newCallerForConvergingNode.callees.shift()!
-            );
-          }
-          if (hasNodeBetweenElseAndEndIf) {
-            // nodeBetweenElseAndEndIf already as the first caller of convergingNode when it should be the if-false branch
-            // the caller position has to be switched so nodeBetweenElseAndEndIf --> convergingNode interpreted as if-false branch
-            convergingNode.callers.push(convergingNode.callers.shift()!);
-          }
-        }
-      });
-    }
   }
 
   public generateEdges() {

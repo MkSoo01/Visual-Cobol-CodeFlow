@@ -52,6 +52,7 @@ suite("Tests for Control Flow Visitor", () => {
       endLineNumber: endLineNumber,
       callers: [],
       callees: [],
+      flow: "f1",
     };
   }
 
@@ -507,165 +508,6 @@ suite("Tests for Control Flow Visitor", () => {
     expect(visitChildrenStub).to.have.been.calledOnce;
   });
 
-  test("the condition node data to be captured correctly", function () {
-    const expectedNodeName = "IF OFFICIAL-RATE EQUALS ZEROES";
-    const expectedStartLineNumber = 245;
-    const expectedEndLineNumber = 253;
-    const expectedNodeId = expectedStartLineNumber.toString();
-
-    let stubCtx = createStubParserRuleCtx(
-      sinon.createStubInstance(IfStatementContext),
-      "",
-      expectedStartLineNumber,
-      expectedEndLineNumber
-    ) as IfStatementContext;
-
-    initIfStatementCtx(stubCtx, expectedNodeName);
-
-    visitor.visitIfStatement(stubCtx);
-
-    const actual = visitor.getNodes()[0];
-    const expected = formNode(
-      expectedNodeId,
-      expectedNodeName,
-      NodeType.CONDITION,
-      expectedStartLineNumber,
-      expectedEndLineNumber
-    );
-
-    expect(actual).to.deep.equal(expected);
-  });
-
-  test("visitIfStatement capture caller and callee data correctly", function () {
-    const conditionNodeName = "IF OFFICIAL-RATE EQUALS ZEROES";
-    const condtionStartLineNumber = 245;
-    const condtionEndLineNumber = 253;
-    const condtionNodeId = condtionStartLineNumber.toString();
-    const caller = "1000-INIT";
-    const callerStartLineNumber = 100;
-    const callerEndLineNumber = 200;
-    const callerID = callerStartLineNumber.toString();
-    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
-      caller,
-      callerStartLineNumber,
-      callerEndLineNumber
-    ) as ParagraphContext;
-
-    let stubCtx = createStubParserRuleCtx(
-      sinon.createStubInstance(IfStatementContext),
-      "",
-      condtionStartLineNumber,
-      condtionEndLineNumber
-    ) as IfStatementContext;
-
-    initIfStatementCtx(stubCtx, conditionNodeName);
-    setParent(stubCtx, stubParagraphCtx);
-
-    visitor.visitIfStatement(stubCtx);
-
-    expect(
-      visitor.getCallerToCalleesMap().get(callerID),
-      "Caller to Callees Map"
-    ).to.have.members([condtionNodeId]);
-    expect(
-      visitor.getCalleeToCallersMap().get(condtionNodeId),
-      "Callee to Caller Map"
-    ).to.have.members([callerID]);
-  });
-
-  test("visitIfStatement call visitChildren once at the end", function () {
-    const visitChildrenStub = sinon.stub(visitor, "visitChildren");
-
-    let stubCtx = createStubParserRuleCtx(
-      sinon.createStubInstance(IfStatementContext),
-      "",
-      0,
-      0
-    ) as IfStatementContext;
-
-    initIfStatementCtx(stubCtx, "");
-
-    visitor.visitIfStatement(stubCtx);
-
-    expect(visitChildrenStub).to.have.been.calledOnce;
-  });
-
-  test("the Else node data to be captured correctly", function () {
-    const expectedNodeName = "ELSE";
-    const expectedStartLineNumber = 245;
-    const expectedEndLineNumber = 253;
-    const expectedNodeId = expectedStartLineNumber.toString();
-    const conditionNodeStartLineNumber = 230;
-    const conditionNodeEndLineNumber = 260;
-    const conditionNodeId = conditionNodeStartLineNumber.toString();
-
-    let stubConditionCtx = createStubParserRuleCtx(
-      sinon.createStubInstance(IfStatementContext),
-      "",
-      conditionNodeStartLineNumber,
-      conditionNodeEndLineNumber
-    ) as IfStatementContext;
-
-    const stubIfElseCtx = createStubParserRuleCtx(
-      sinon.createStubInstance(IfElseContext),
-      "",
-      expectedStartLineNumber,
-      expectedEndLineNumber
-    ) as IfElseContext;
-
-    const stubElseTerminalNode: TerminalNode = {
-      text: "ELSE",
-    } as TerminalNode;
-
-    stubIfElseCtx.ELSE = () => stubElseTerminalNode;
-
-    setParent(stubIfElseCtx, stubConditionCtx);
-
-    visitor.visitIfElse(stubIfElseCtx);
-
-    const actual = visitor.getNodes()[0];
-    const expected = formNode(
-      expectedNodeId,
-      expectedNodeName,
-      NodeType.CONDITION_ELSE,
-      expectedStartLineNumber,
-      expectedEndLineNumber
-    );
-
-    expect(actual).to.deep.equal(expected);
-    expect(
-      visitor.getCallerToCalleesMap().get(conditionNodeId),
-      "Caller to Callees Map"
-    ).to.contain.members([actual.id]);
-    expect(
-      visitor.getCalleeToCallersMap().get(actual.id),
-      "Callee to Callers Map"
-    ).to.have.members([conditionNodeId]);
-  });
-
-  test("visitIfElse call visitChildren once at the end", function () {
-    const startLineNumber = 245;
-    const endLineNumber = 253;
-    const visitChildrenStub = sinon.stub(visitor, "visitChildren");
-
-    const stubIfElseCtx = createStubParserRuleCtx(
-      sinon.createStubInstance(IfElseContext),
-      "",
-      startLineNumber,
-      endLineNumber
-    ) as IfElseContext;
-
-    const stubElseTerminalNode: TerminalNode = {
-      text: "ELSE",
-    } as TerminalNode;
-
-    stubIfElseCtx.ELSE = () => stubElseTerminalNode;
-
-    visitor.visitIfElse(stubIfElseCtx);
-
-    expect(visitChildrenStub).to.have.been.calledOnce;
-  });
-
   test("the loop node data to be captured correctly", function () {
     const expectedNodeName = "PERFORM UNTIL SQLCODE = CC-NOT-FOUND";
     const expectedStartLineNumber = 245;
@@ -750,7 +592,13 @@ suite("Tests for Control Flow Visitor", () => {
   });
 
   test("when visitChildren get EOF, callers and callees of the node are populated correctly", function () {
-    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const startNode = formNode(
+      "100",
+      "0000-MAIN-ROUTINE",
+      NodeType.START,
+      100,
+      200
+    );
 
     const normalNode = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400);
     const normalNodeCallee = formNode(
@@ -782,7 +630,13 @@ suite("Tests for Control Flow Visitor", () => {
   });
 
   test("callers and callees of the node will not be populated unless visitChildren get EOF", function () {
-    const startNode = formNode("100", "0000-START", NodeType.START, 100, 200);
+    const startNode = formNode(
+      "100",
+      "0000-MAIN-ROUTINE",
+      NodeType.START,
+      100,
+      200
+    );
     const normalNodeLabel = "1000-INIT";
 
     const normalNode = formNode(

@@ -317,12 +317,12 @@ export class ControlFlowGraph {
   }
 
   public generateEdges() {
-    let latestLoopNodeId: string = "";
-    let lastLoopNodeCallee: string = "";
+    let latestLoopNodeId: string[] = [];
+    let lastLoopNodeCallee: string[] = [];
 
     this.getDisplayNodes().forEach((n) => {
-      if (n.id === lastLoopNodeCallee) {
-        this.addEdge(this.formEdge(n.id, latestLoopNodeId, true));
+      if (n.id === lastLoopNodeCallee[lastLoopNodeCallee.length - 1]) {
+        this.addEdge(this.formEdge(n.id, latestLoopNodeId.pop()!, true));
       }
 
       if (n.callees.length > 0) {
@@ -331,11 +331,25 @@ export class ControlFlowGraph {
         });
 
         if (n.type === NodeType.LOOP) {
-          latestLoopNodeId = n.id;
+          latestLoopNodeId.push(n.id);
           const loopNodeCallees = this.getRawNodes().find(
-            (r) => r.id === n.id
+            (r) => r.id === this.getRawId(n.id)
           )!.callees;
-          lastLoopNodeCallee = loopNodeCallees[loopNodeCallees.length - 1];
+
+          let lastLoopNodeCalleeTmp =
+            loopNodeCallees[loopNodeCallees.length - 1];
+          if (
+            this.getDisplayNodes().find(
+              (d) => d.id === lastLoopNodeCalleeTmp
+            ) === undefined
+          ) {
+            lastLoopNodeCalleeTmp = this.getDupIdBasedOnCaller(
+              lastLoopNodeCalleeTmp,
+              n.id
+            );
+          }
+
+          lastLoopNodeCallee.push(lastLoopNodeCalleeTmp);
         }
       }
     });

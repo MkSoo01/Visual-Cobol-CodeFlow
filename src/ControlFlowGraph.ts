@@ -195,9 +195,22 @@ export class ControlFlowGraph {
     const removedNodes: Node[] = [];
     removedNodes.push(
       ...rawNodes.filter(
-        (n) => n.type !== NodeType.START && n.callers.length === 0
+        (n) =>
+          n.type !== NodeType.START &&
+          (n.callers.length === 0 || n.callers.length > 5)
       )
     );
+
+    rawNodes
+      .filter((n) => n.callers.length > 5)
+      .forEach((n) => {
+        n.callers.forEach((caller) => {
+          const callerNode = rawNodes.find((node) => node.id === caller);
+          if (callerNode) {
+            callerNode.callees = callerNode.callees.filter((c) => c !== n.id);
+          }
+        });
+      });
 
     rawNodes
       .filter((n) => n.type === NodeType.LOOP)
@@ -314,6 +327,31 @@ export class ControlFlowGraph {
       [...startNodeForDisplay.callees],
       false
     );
+
+    // remove dups that has 15 or more
+    const tooManyDupsList = this.getDisplayNodes().filter((n) =>
+      n.id.includes("_15")
+    );
+    tooManyDupsList.forEach((n) => {
+      const dupNodeList = this.getDisplayNodes().filter(
+        (node) => node.startLineNumber === n.startLineNumber
+      );
+      dupNodeList.forEach((dup) => {
+        this.removeDisplayNodeByIndex(this.getDisplayNodes().indexOf(dup));
+        const callerNode = this.getDisplayNodes().find(
+          (n) => n.id === dup.callers[0]
+        );
+        const calleeNode = this.getDisplayNodes().find(
+          (n) => n.id === dup.callees[0]
+        );
+        if (callerNode && calleeNode) {
+          callerNode.callees = callerNode.callees.filter((c) => c !== dup.id);
+          calleeNode.callers = calleeNode.callers.filter((c) => c !== dup.id);
+          callerNode.callees.push(calleeNode.id);
+          calleeNode.callers.push(callerNode.id);
+        }
+      });
+    });
   }
 
   public generateEdges() {

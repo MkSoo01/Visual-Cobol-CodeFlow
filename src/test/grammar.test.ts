@@ -1,12 +1,12 @@
 const chai = require("chai");
 import { VisualCobolLexer } from "../generated/VisualCobolLexer";
+import { VisualCobolParser } from "../generated/VisualCobolParser";
 import {
-  VisualCobolParser,
-  AuthorParagraphContext,
-  DateWrittenParagraphContext,
-  StopStatementContext,
-} from "../generated/VisualCobolParser";
-import { CharStreams, CommonTokenStream, Token } from "antlr4ts";
+  CharStreams,
+  CommonTokenStream,
+  Token,
+  BailErrorStrategy,
+} from "antlr4ts";
 
 const expect = chai.expect;
 
@@ -15,6 +15,7 @@ function parseInput(input: string): VisualCobolParser {
   const lexer = new VisualCobolLexer(inputStream);
   const tokenStream = new CommonTokenStream(lexer);
   const parser = new VisualCobolParser(tokenStream);
+  parser.errorHandler = new BailErrorStrategy();
   return parser;
 }
 
@@ -172,26 +173,32 @@ suite("Visual COBOL Grammar Tests for lexer", () => {
     expect(tokens[0].text).to.equal("TEST");
   });
 
-  test("should tokenize 'EXEC SQL' correctly", () => {
+  test("SKIP_DOLLAR_SIGN should not skip the text with '$'", () => {
+    const tokens = tokenize("$if var defined");
+
+    expect(tokens[0].type).to.equal(Token.EOF);
+  });
+
+  test("'EXEC SQL' tokenized correctly", () => {
     const tokens = tokenize("EXEC SQL");
 
     expect(tokens[0].type).to.equal(VisualCobolLexer.EXECSQLTAG);
   });
 
-  test("should tokenize 'EXEC SQL' correctly 2", () => {
+  test("'EXEC SQL' tokenized correctly 2", () => {
     const tokens = tokenize("EXECSQL");
 
     expect(tokens[0].type).to.not.equal(VisualCobolLexer.EXECSQLTAG);
   });
 
-  test("should tokenize EXECSQLLINE in single line correctly", () => {
+  test("EXECSQLLINE in single line tokenized correctly", () => {
     const tokens = tokenize("EXEC SQL INCLUDE SQLCA END-EXEC.");
 
     expect(tokens[0].type).to.equal(VisualCobolLexer.EXECSQLLINE);
     expect(tokens[1].type).to.equal(VisualCobolLexer.DOT_FS);
   });
 
-  test("should tokenize EXECSQLLINE in multiple lines correctly", () => {
+  test("EXECSQLLINE in multiple lines tokenized correctly", () => {
     const tokens = tokenize(
       "EXEC SQL DECLARE SELECT CURSOR FOR\r\nLINE 2\r\nLINE 3\r\nEND-EXEC."
     );
@@ -202,8 +209,8 @@ suite("Visual COBOL Grammar Tests for lexer", () => {
 });
 
 suite("Visual COBOL Grammar Tests for parser", () => {
-  test("should parse valid author paragraph without comment", () => {
-    const input = "AUTHOR. JohnDoe.";
+  test("author paragraph without comment", () => {
+    const input = "AUTHOR. John Doe.";
     const authorContext = parseInput(input).authorParagraph();
 
     expect(authorContext).to.not.be.null;
@@ -213,7 +220,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(authorName).equal("JohnDoe");
   });
 
-  test("should parse valid author paragraph with comment", () => {
+  test("author paragraph with comment", () => {
     const input = "AUTHOR. JohnDoe. *Author comment";
     const authorContext = parseInput(input).authorParagraph();
 
@@ -224,7 +231,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(authorName).equal("JohnDoe");
   });
 
-  test("should parse valid date (dd/mm/yy) Written without comment", () => {
+  test("date (dd/mm/yy) Written", () => {
     const input = "DATE-WRITTEN.   28/10/21";
     const dateWrittenContext = parseInput(input).dateWrittenParagraph();
 
@@ -235,7 +242,18 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(dateWritten).equal("28/10/21");
   });
 
-  test("should parse valid date (dd/mm/yyyy) Written without comment", () => {
+  test("date (dd/mm/yy) Written in different format", () => {
+    const input = "DATE-WRITTEN.   28 October 2021";
+    const dateWrittenContext = parseInput(input).dateWrittenParagraph();
+
+    expect(dateWrittenContext).to.not.be.null;
+    expect(dateWrittenContext.childCount).to.be.greaterThan(0);
+
+    const dateWritten = dateWrittenContext.dateIdentifier().text;
+    expect(dateWritten).equal("28October2021");
+  });
+
+  test("date (dd/mm/yyyy) Written without comment", () => {
     const input = "DATE-WRITTEN.   28/10/2021";
     const dateWrittenContext = parseInput(input).dateWrittenParagraph();
 
@@ -246,7 +264,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(dateWritten).equal("28/10/2021");
   });
 
-  test("should parse valid date Written with comment", () => {
+  test("date Written with comment", () => {
     const input = "DATE-WRITTEN.   28/10/2021 *Date written comment";
     const dateWrittenContext = parseInput(input).dateWrittenParagraph();
 
@@ -257,7 +275,41 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(dateWritten).equal("28/10/2021");
   });
 
-  test("should parse STOP statement correctly", () => {
+  test("fileSection with fileDescriptionEntry", () => {
+    const input =
+      " FILE  SECTION.\r\nFD  DOWNCONT-FILE\r\nLABEL RECORDS ARE OMITTED.";
+    const fileDescriptionEntry = parseInput(input)
+      .fileSection()
+      .fileDescriptionEntry();
+
+    expect(fileDescriptionEntry.length).to.be.greaterThan(0);
+  });
+
+  test("fileSection with dataDescriptionEntry", () => {
+    const input =
+      " FILE  SECTION.\r\n 01  DOWNCONT-DATA.\r\n  05  REC-TYPE                        PIC 9(01).";
+    const dataDescriptionEntry = parseInput(input)
+      .fileSection()
+      .dataDescriptionEntry();
+
+    expect(dataDescriptionEntry.length).to.be.greaterThan(0);
+  });
+
+  test("labelRecordsClause with 'RECORDS ARE' ", () => {
+    const input = "LABEL RECORDS ARE OMITTED.";
+    const labelRecordsClause = parseInput(input).labelRecordsClause();
+
+    expect(labelRecordsClause.text).not.to.be.empty;
+  });
+
+  test("labelRecordsClause with 'RECORD ARE' without s ", () => {
+    const input = "LABEL RECORD ARE OMITTED.";
+    const labelRecordsClause = parseInput(input).labelRecordsClause();
+
+    expect(labelRecordsClause.text).not.to.be.empty;
+  });
+
+  test("STOP statement", () => {
     const input = "STOP RUN.";
     const StopStatementContext = parseInput(input).stopStatement();
 
@@ -265,7 +317,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(StopStatementContext.childCount).to.be.equal(2);
   });
 
-  test("should parse STOP statement with GIVING 1 correctly", () => {
+  test("STOP statement with GIVING 1", () => {
     const input = "STOP RUN GIVING 1.";
     const StopStatementContext = parseInput(input).stopStatement();
 
@@ -273,7 +325,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(StopStatementContext.childCount).to.be.equal(3);
   });
 
-  test("should parse the paragraphExit correctly", () => {
+  test("the paragraphExit", () => {
     const input = "0000-MAIN-ROUTINE.\r\n 0000-EXIT.";
     const paragraph = parseInput(input).paragraph();
 
@@ -286,7 +338,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(paragraphExit).to.be.equal("0000-EXIT.");
   });
 
-  test("should parse the lastParagraph correctly", () => {
+  test("the lastParagraph", () => {
     const input =
       "0000-MAIN-ROUTINE.\r\n 0000-EXIT.\r\n EXEC SQL\r\n COMMIT \r\n END-EXEC.\r\n STOP RUN.";
     const paragraph = parseInput(input).paragraph();
@@ -302,7 +354,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(lastParagraphNode?.DOT_FS()).to.not.be.null;
   });
 
-  test("should parse the classCondition with 'EQUALS ZEROS' correctly", () => {
+  test("the classCondition with 'EQUALS ZEROS'", () => {
     const input = "RESULT EQUALS ZEROS";
     const classCondition = parseInput(input).classCondition();
 
@@ -312,7 +364,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(classCondition.figurativeConstant()?.text).to.be.equal("ZEROS");
   });
 
-  test("should parse the classCondition with 'EQUALS SPACES' correctly", () => {
+  test("the classCondition with 'EQUALS SPACES'", () => {
     const input = "RESULT EQUALS SPACES";
     const classCondition = parseInput(input).classCondition();
 
@@ -320,5 +372,14 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(classCondition.getChild(0).text).to.be.equal("RESULT");
     expect(classCondition.getChild(1).text).to.be.equal("EQUALS");
     expect(classCondition.figurativeConstant()?.text).to.be.equal("SPACES");
+  });
+
+  test("callByReferencePhrase", () => {
+    const input = " WS-PORTION\r\n  ,WS-TEXT\r\n  ,WS-RESULT";
+    const callByReference = parseInput(input)
+      .callByReferencePhrase()
+      .callByReference();
+
+    expect(callByReference.length).to.be.equal(3);
   });
 });

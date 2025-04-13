@@ -68,7 +68,7 @@ authorParagraph
     ;
 
 authorName
-    : IDENTIFIER
+    : IDENTIFIER (IDENTIFIER)*
     ;
 
 // - installation paragraph ----------------------------------
@@ -80,11 +80,11 @@ installationParagraph
 // - date written paragraph ----------------------------------
 
 dateWrittenParagraph
-    : DATE_WRITTEN DOT_FS dateIdentifier commentEntry?
+    : DATE_WRITTEN DOT_FS dateIdentifier DOT_FS? commentEntry?
     ;
 
 dateIdentifier
-    : (INTEGERLITERAL | SLASHCHAR)+
+    : (INTEGERLITERAL | SLASHCHAR | IDENTIFIER)+
     ;
 
 // - date compiled paragraph ----------------------------------
@@ -468,7 +468,7 @@ dataDivisionSection
 // -- file section ----------------------------------
 
 fileSection
-    : FILE SECTION DOT_FS fileDescriptionEntry*
+    : FILE SECTION DOT_FS (dataDescriptionEntry | fileDescriptionEntry)*
     ;
 
 fileDescriptionEntry
@@ -532,7 +532,7 @@ recordContainsTo
     ;
 
 labelRecordsClause
-    : LABEL (RECORD IS? | RECORDS ARE?) (OMITTED | STANDARD | dataName+)
+    : LABEL (RECORD IS? | RECORDS ARE? | RECORD ARE?) (OMITTED | STANDARD | dataName+)
     ;
 
 valueOfClause
@@ -1627,7 +1627,7 @@ callByReferencePhrase
     ;
 
 callByReference
-    : ((ADDRESS OF | INTEGER | STRING)? identifier | literal | fileName)
+    : ((ADDRESS OF | INTEGER | STRING | COMMACHAR)? identifier | literal | fileName)
     | OMITTED
     ;
 
@@ -5046,6 +5046,10 @@ SKIP_COPY_DIRECTIVE
 
 SKIP_ANOMALY
     : '/' ('\r'? '\n') -> skip
+    ;
+
+SKIP_DOLLAR_SIGN
+    : DOLLARCHAR ~[\r\n]* -> skip
     ;
 
 SKIP_MULTIPLY

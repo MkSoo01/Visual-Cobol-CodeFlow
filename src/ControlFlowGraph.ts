@@ -142,6 +142,7 @@ export class ControlFlowGraph {
     this.addRawNodes(visitor.getNodes());
     this.generateDisplayNodes();
     this.generateEdges();
+    console.log(this.generateMermaidGraph(this.displayNodes, this.edges));
   }
 
   private findCalleesOfRemovedNode(
@@ -352,5 +353,20 @@ export class ControlFlowGraph {
         }
       }
     });
+  }
+
+  public generateMermaidGraph(nodes: Node[], edges: Edge[]): string {
+    const nodeMap = new Map(
+      nodes.map((n) => [n.id, n.label + " (" + n.startLineNumber + ")"])
+    );
+    const lines = ["graph TD"];
+    for (const edge of edges) {
+      const sourceLabel = nodeMap.get(edge.source) ?? edge.source;
+      const targetLabel = nodeMap.get(edge.target) ?? edge.target;
+      lines.push(
+        `\t${edge.source}["${sourceLabel}"] --> ${edge.target}["${targetLabel}"]`
+      );
+    }
+    return lines.join("\n");
   }
 }

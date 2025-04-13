@@ -119,6 +119,13 @@ export class ControlFlowVisitor
   visitPerformProcedureStatement(
     ctx: VisualCobolParser.PerformProcedureStatementContext
   ): void {
+    const isForHandlingError: boolean = ctx
+      .procedureName(0)
+      .text?.startsWith("99");
+    if (isForHandlingError) {
+      return;
+    }
+
     const ancestor = this.getAncestor(ctx);
     let caller = undefined;
     let callee = undefined;

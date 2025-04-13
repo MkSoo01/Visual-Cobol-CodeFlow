@@ -217,6 +217,29 @@ suite("Tests for Control Flow Visitor", () => {
     expect(visitChildrenStub).to.have.been.calledOnce;
   });
 
+  test("Paragraph for handling the error is ignored", function () {
+    const callerNodeName = "0000-MAIN-ROUTINE";
+    const callerStartLineNumber = 235;
+    const callerEndLineNumber = 256;
+    const callerId = callerStartLineNumber.toString();
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
+      callerNodeName,
+      callerStartLineNumber,
+      callerEndLineNumber
+    ) as unknown as ParagraphContext;
+
+    const procedureName = "9920-PROCESS-SQL-ERROR";
+    const stubCtx = createStubPerformProcedureStatementCtx(
+      procedureName,
+      stubParagraphCtx
+    );
+
+    visitor.visitPerformProcedureStatement(stubCtx);
+
+    expect(visitor.getCallerToCalleesMap().get(callerId)).to.be.undefined;
+    expect(visitor.getCalleeToCallersMap().get(procedureName)).to.be.undefined;
+  });
+
   test("caller and callee to be captured correctly in visitPerformProcedureStatement", function () {
     const callerNodeName = "0000-MAIN-ROUTINE";
     const callerStartLineNumber = 235;

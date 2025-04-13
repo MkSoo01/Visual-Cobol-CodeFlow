@@ -1,13 +1,6 @@
 const chai = require("chai");
 const sinonChai = require("sinon-chai");
 import {
-  ClassConditionContext,
-  CombinableConditionContext,
-  ConditionContext,
-  FigurativeConstantContext,
-  IdentifierContext,
-  IfElseContext,
-  IfStatementContext,
   ParagraphContext,
   ParagraphNameContext,
   PerformInlineStatementContext,
@@ -16,9 +9,7 @@ import {
   PerformTypeContext,
   PerformUntilContext,
   ProcedureNameContext,
-  RelationConditionContext,
   SentenceContext,
-  SimpleConditionContext,
   StatementContext,
 } from "../generated/VisualCobolParser";
 import { ControlFlowVisitor } from "../ControlFlowVisitor";
@@ -140,77 +131,6 @@ suite("Tests for Control Flow Visitor", () => {
     return stubCtx;
   }
 
-  function initIfStatementCtx(
-    stubIfStatementCtx: IfStatementContext,
-    ifStatementText: string
-  ) {
-    const textArray = ifStatementText.split(" ");
-    textArray.shift();
-
-    const stubCobolWordTerminalNode = sinon.createStubInstance(TerminalNode);
-    defineProperty(stubCobolWordTerminalNode, "text", textArray[0]);
-
-    const stubTerminalNode = sinon.createStubInstance(TerminalNode);
-    defineProperty(stubTerminalNode, "text", textArray[1]);
-
-    const stubFigurativeConstantTerminalNode =
-      sinon.createStubInstance(TerminalNode);
-    defineProperty(
-      stubFigurativeConstantTerminalNode,
-      "text",
-      textArray.slice(2).join(" ")
-    );
-
-    const stubConditionCtx = sinon.createStubInstance(ConditionContext);
-    const stubCombinableConditionCtx = sinon.createStubInstance(
-      CombinableConditionContext
-    );
-    const stubSimpleConditionCtx = sinon.createStubInstance(
-      SimpleConditionContext
-    );
-    const stubClassConditionCtx = sinon.createStubInstance(
-      ClassConditionContext
-    );
-    const stubIdentifierCtx = sinon.createStubInstance(IdentifierContext);
-    const stubFigurativeConstantCtx = sinon.createStubInstance(
-      FigurativeConstantContext
-    );
-
-    defineProperty(stubConditionCtx, "childCount", 1);
-    defineProperty(stubCombinableConditionCtx, "childCount", 1);
-    defineProperty(stubSimpleConditionCtx, "childCount", 1);
-    defineProperty(stubClassConditionCtx, "childCount", 3);
-    defineProperty(stubIdentifierCtx, "childCount", 1);
-    defineProperty(stubFigurativeConstantCtx, "childCount", 1);
-
-    stubConditionCtx.getChild.withArgs(0).returns(stubCombinableConditionCtx);
-    stubCombinableConditionCtx.getChild
-      .withArgs(0)
-      .returns(stubSimpleConditionCtx);
-    stubSimpleConditionCtx.getChild.withArgs(0).returns(stubClassConditionCtx);
-    stubClassConditionCtx.getChild.withArgs(0).returns(stubIdentifierCtx);
-    stubClassConditionCtx.getChild.withArgs(1).returns(stubTerminalNode);
-    stubClassConditionCtx.getChild
-      .withArgs(2)
-      .returns(stubFigurativeConstantCtx);
-    stubIdentifierCtx.getChild.withArgs(0).returns(stubCobolWordTerminalNode);
-    stubFigurativeConstantCtx.getChild
-      .withArgs(0)
-      .returns(stubFigurativeConstantTerminalNode);
-
-    const stubIfTerminalNode: TerminalNode = {
-      text: "IF",
-    } as TerminalNode;
-
-    const stubEndIfTerminalNode: TerminalNode = {
-      text: "END-IF",
-    } as TerminalNode;
-
-    stubIfStatementCtx.IF = () => stubIfTerminalNode;
-    stubIfStatementCtx.END_IF = () => stubEndIfTerminalNode;
-    stubIfStatementCtx.condition = () => stubConditionCtx;
-  }
-
   function initPerformInlineStatementCtx(
     stubPerformInlineStatementCtx: PerformInlineStatementContext,
     performInlineStatementText: string
@@ -226,31 +146,9 @@ suite("Tests for Control Flow Visitor", () => {
     defineProperty(untilTerminalNode, "text", textArray[0]);
     const otherTerminalNode = sinon.createStubInstance(TerminalNode);
     defineProperty(otherTerminalNode, "text", textArray.splice(1).join(" "));
-    const stubConditionCtx = sinon.createStubInstance(ConditionContext);
-    const stubCombinableConditionCtx = sinon.createStubInstance(
-      CombinableConditionContext
-    );
-    const stubSimpleConditionCtx = sinon.createStubInstance(
-      SimpleConditionContext
-    );
-    const stubRelationConditionCtx = sinon.createStubInstance(
-      RelationConditionContext
-    );
     stubPerformUntilCtx.getChild.withArgs(0).returns(untilTerminalNode);
-    stubPerformUntilCtx.getChild.withArgs(1).returns(stubConditionCtx);
+    stubPerformUntilCtx.getChild.withArgs(1).returns(otherTerminalNode);
     defineProperty(stubPerformUntilCtx, "childCount", 2);
-    stubConditionCtx.getChild.withArgs(0).returns(stubCombinableConditionCtx);
-    defineProperty(stubConditionCtx, "childCount", 1);
-    stubCombinableConditionCtx.getChild
-      .withArgs(0)
-      .returns(stubSimpleConditionCtx);
-    defineProperty(stubCombinableConditionCtx, "childCount", 1);
-    stubSimpleConditionCtx.getChild
-      .withArgs(0)
-      .returns(stubRelationConditionCtx);
-    defineProperty(stubSimpleConditionCtx, "childCount", 1);
-    stubRelationConditionCtx.getChild.withArgs(0).returns(otherTerminalNode);
-    defineProperty(stubRelationConditionCtx, "childCount", 1);
   }
 
   test("the start node data to be captured correctly", function () {
@@ -346,24 +244,6 @@ suite("Tests for Control Flow Visitor", () => {
       visitor.getCallerToCalleesMap().get(callerId),
       "Caller To Callees Map"
     ).to.have.members([procedureName]);
-  });
-
-  test("caller (conditionNode) and callee to be captured correctly in visitPerformProcedureStatement", function () {
-    const callerStartLineNumber = 235;
-    const callerEndLineNumber = 256;
-    const callerId = callerStartLineNumber.toString();
-    let stubConditionCtx = createStubParserRuleCtx(
-      sinon.createStubInstance(IfStatementContext),
-      "",
-      callerStartLineNumber,
-      callerEndLineNumber
-    ) as IfStatementContext;
-
-    const procedureName = "1000-INIT";
-    const stubCtx = createStubPerformProcedureStatementCtx(
-      procedureName,
-      stubConditionCtx
-    );
   });
 
   test("caller (loop node) and callee to be captured correctly in visitPerformProcedureStatement", function () {

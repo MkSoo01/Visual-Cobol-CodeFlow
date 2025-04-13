@@ -245,7 +245,6 @@ export class ControlFlowGraph {
               [...calleeNode.callees],
               true
             );
-            callerNodeIsDup = false;
           } else {
             callerNode = this.createDisplayNodesForCallees(
               calleeNode,

@@ -124,8 +124,8 @@ export class ControlFlowGraph {
     }
   }
 
-  public generateGraph(filePath: string) {
-    const fileContent = fs.readFileSync(filePath, "utf-8");
+  public generateGraph(fileContent: string): string {
+    //const fileContent = fs.readFileSync(filePath, "utf-8");
     // const fileContent = fs.readFileSync(
     //   "C:/Users/khims/source/repos/visual-cobol-codeflow/out/test/backtesting-summary.cbl",
     //   "utf-8"
@@ -142,7 +142,7 @@ export class ControlFlowGraph {
     this.addRawNodes(visitor.getNodes());
     this.generateDisplayNodes();
     this.generateEdges();
-    console.log(this.generateMermaidGraph(this.displayNodes, this.edges));
+    return this.generateMermaidGraph(this.displayNodes, this.edges);
   }
 
   private findCalleesOfRemovedNode(
@@ -397,7 +397,7 @@ export class ControlFlowGraph {
     const nodeMap = new Map(
       nodes.map((n) => [n.id, n.label + " (" + n.startLineNumber + ")"])
     );
-    const lines = ["graph TD"];
+    const lines = ["```mermaid", "graph TD"];
     for (const edge of edges) {
       const sourceLabel = nodeMap.get(edge.source) ?? edge.source;
       const targetLabel = nodeMap.get(edge.target) ?? edge.target;
@@ -405,6 +405,7 @@ export class ControlFlowGraph {
         `\t${edge.source}["${sourceLabel}"] --> ${edge.target}["${targetLabel}"]`
       );
     }
+    lines.push("```");
     return lines.join("\n");
   }
 }

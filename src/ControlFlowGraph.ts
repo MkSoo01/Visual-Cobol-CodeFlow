@@ -1,5 +1,5 @@
 import { ControlFlowVisitor } from "./ControlFlowVisitor";
-import { CharStreams, CommonTokenStream } from "antlr4ts";
+import { BailErrorStrategy, CharStreams, CommonTokenStream } from "antlr4ts";
 import * as fs from "fs";
 import { VisualCobolLexer } from "./generated/VisualCobolLexer";
 import { VisualCobolParser } from "./generated/VisualCobolParser";
@@ -134,6 +134,7 @@ export class ControlFlowGraph {
     const lexer = new VisualCobolLexer(inputStream);
     const tokenStream = new CommonTokenStream(lexer);
     const parser = new VisualCobolParser(tokenStream);
+    //parser.errorHandler = new BailErrorStrategy();
     const tree = parser.startRule();
 
     const visitor = new ControlFlowVisitor();
@@ -361,6 +362,7 @@ export class ControlFlowGraph {
     this.getDisplayNodes().forEach((n) => {
       if (n.id === lastLoopNodeCallee[lastLoopNodeCallee.length - 1]) {
         this.addEdge(this.formEdge(n.id, latestLoopNodeId.pop()!, true));
+        lastLoopNodeCallee.pop();
       }
 
       if (n.callees.length > 0) {

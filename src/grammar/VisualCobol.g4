@@ -35,19 +35,6 @@ identificationDivision
     : (IDENTIFICATION | ID) DIVISION DOT_FS genericText*
     ;
 
-genericText
-    : GENERIC_WORD+ DOT_FS?
-    | execSqlStatement DOT_FS?
-    | integerLiteral DOT_FS?
-    | cobolWord DOT_FS?
-    | NUMERICLITERAL DOT_FS?
-    | NONNUMERICLITERAL DOT_FS?
-    ;
-
-execSqlStatement
-    : EXECSQLLINE+
-    ;
-
 environmentDivision
     : ENVIRONMENT DIVISION DOT_FS genericText*
     ;
@@ -65,7 +52,7 @@ procedureDivisionUsingClause
     ;
 
 procedureDivisionGivingClause
-    : (GIVING | RETURNING) (cobolWord | GENERIC_WORD)
+    : (GIVING | RETURNING) dataName
     ;
 
 procedureDivisionUsingParameter
@@ -78,7 +65,7 @@ procedureDivisionByReferencePhrase
     ;
 
 procedureDivisionByReference
-    : (OPTIONAL? (identifier | GENERIC_WORD | cobolWord))
+    : (OPTIONAL? (identifier | fileName))
     | ANY
     ;
 
@@ -88,23 +75,20 @@ procedureDivisionByValuePhrase
 
 procedureDivisionByValue
     : identifier
-    | integerLiteral
-    | NUMERICLITERAL
-    | NONNUMERICLITERAL
+    | literal
     | ANY
-    | GENERIC_WORD
     ;
 
 procedureDeclaratives
-    : DECLARATIVES DOT_FS procedureDeclarative+ END DECLARATIVES DOT_FS
+    : DECLARATIVES DOT_FS (procedureDeclarative | genericDeclarative)* END DECLARATIVES DOT_FS
     ;
 
 procedureDeclarative
     : procedureSectionHeader DOT_FS useStatement DOT_FS paragraphs
     ;
 
-useStatement
-    : USE (GENERIC_WORD | cobolWord)+
+genericDeclarative
+    : sectionName DOT_FS paragraphs
     ;
 
 procedureSectionHeader
@@ -115,16 +99,15 @@ procedureDivisionBody
     : paragraphs
     ;
 
+// -- procedure section ----------------------------------
+
+
 paragraphs
     : sentence* paragraph*
     ;
 
 paragraph
-    : paragraphName DOT_FS sentence* paragraphExit? lastParagraph?
-    ;
-
-paragraphName
-    : IDENTIFIER
+    : paragraphName DOT_FS (alteredGoTo | sentence*) paragraphExit? lastParagraph?
     ;
 
 paragraphExit
@@ -141,129 +124,245 @@ sentence
 
 statement
     : execSqlStatement
-    | ifStatement
     | performStatement
+    | alterStatement
+    | goToStatement
+    | mergeStatement
+    | sortStatement
     | genericStatement
     ;
 
-ifStatement
-    : IF condition ifThen ifElse? END_IF?
+alteredGoTo
+    : GO TO? DOT_FS
     ;
 
-condition
-    : combinableCondition andOrCondition*
+// alter statement
+
+alterStatement
+    : ALTER alterProceedTo+
     ;
 
-andOrCondition
-    : (AND | OR) (combinableCondition | abbreviation+)
+alterProceedTo
+    : procedureName TO (PROCEED TO)? procedureName
     ;
 
-combinableCondition
-    : NOT? simpleCondition
+execSqlStatement
+    : EXECSQLLINE+
     ;
 
-simpleCondition
-    : LPARENCHAR condition RPARENCHAR
-    | relationCondition
-    | classCondition
-    | conditionNameReference
+// goto statement
+
+goToStatement
+    : GO TO? (goToStatementSimple | goToDependingOnStatement)
     ;
 
-classCondition
-    : identifier IS? NOT? EQUALS? (GENERIC_WORD | ZERO)?
+goToStatementSimple
+    : procedureName
     ;
 
-identifier
-    : qualifiedDataName
-    | tableCall
-    | functionCall
-    | specialRegister
+goToDependingOnStatement
+    : MORE_LABELS
+    | procedureName+ (DEPENDING ON? identifier)?
     ;
 
-tableCall
-    : qualifiedDataName (GENERIC_WORD | cobolWord)+
+// merge statement
+
+mergeStatement
+    : MERGE fileName mergeOnKeyClause+ mergeCollatingSequencePhrase? mergeUsing* mergeOutputProcedurePhrase? mergeGivingPhrase*
     ;
 
-qualifiedDataName
-    : qualifiedDataNameFormat1
-    | qualifiedDataNameFormat2
-    | qualifiedDataNameFormat3
-    | qualifiedDataNameFormat4
+mergeOnKeyClause
+    : ON? (ASCENDING | DESCENDING) KEY? qualifiedDataName+
     ;
 
-qualifiedDataNameFormat1
-    : (GENERIC_WORD | cobolWord) (qualifiedInData+ inSection? | inSection)?
+mergeCollatingSequencePhrase
+    : COLLATING? SEQUENCE IS? alphabetName+ mergeCollatingAlphanumeric? mergeCollatingNational?
     ;
 
-qualifiedDataNameFormat2
-    : paragraphName inSection
+mergeCollatingAlphanumeric
+    : FOR? ALPHANUMERIC IS alphabetName
     ;
 
-qualifiedDataNameFormat3
-    : (GENERIC_WORD | cobolWord) inSection
+mergeCollatingNational
+    : FOR? NATIONAL IS? alphabetName
     ;
 
-qualifiedDataNameFormat4
-    : LINAGE_COUNTER inSection
+mergeUsing
+    : USING fileName+
     ;
 
-qualifiedInData
-    : inSection
+mergeOutputProcedurePhrase
+    : OUTPUT PROCEDURE IS? procedureName mergeOutputThrough?
     ;
 
-functionCall
-    : FUNCTION (GENERIC_WORD | cobolWord)+
+mergeOutputThrough
+    : (THROUGH | THRU) procedureName
     ;
 
-specialRegister
-    : GENERIC_WORD OF GENERIC_WORD
+mergeGivingPhrase
+    : GIVING mergeGiving+
+    ;
+
+mergeGiving
+    : fileName (LOCK | SAVE | NO REWIND | CRUNCH | RELEASE | WITH REMOVE CRUNCH)?
+    ;
+
+// perform statement
+
+performStatement
+    : PERFORM (performInlineStatement | performProcedureStatement)
+    ;
+
+performInlineStatement
+    : performType statement* END_PERFORM
+    ;
+
+performProcedureStatement
+    : procedureName ((THROUGH | THRU) procedureName)? performType?
+    ;
+
+performType
+    : performTimes
+    | performUntil
+    | performVarying
+    ;
+
+performTimes
+    : (identifier | integerLiteral) TIMES
+    ;
+
+performUntil
+    : performTestClause? UNTIL condition
+    ;
+
+performVarying
+    : performTestClause performVaryingClause
+    | performVaryingClause performTestClause?
+    ;
+
+performVaryingClause
+    : VARYING performVaryingPhrase performAfter*
+    ;
+
+performVaryingPhrase
+    : (identifier | literal) performFrom performBy performUntil
+    ;
+
+performAfter
+    : AFTER performVaryingPhrase
+    ;
+
+performFrom
+    : FROM (identifier | literal | arithmeticExpression)
+    ;
+
+performBy
+    : BY (identifier | literal | arithmeticExpression)
+    ;
+
+performTestClause
+    : WITH? TEST (BEFORE | AFTER)
+    ;
+
+// sort statement
+
+sortStatement
+    : SORT fileName sortOnKeyClause+ sortDuplicatesPhrase? sortCollatingSequencePhrase? sortInputProcedurePhrase? sortUsing* sortOutputProcedurePhrase
+        ? sortGivingPhrase*
+    ;
+
+sortOnKeyClause
+    : ON? (ASCENDING | DESCENDING) KEY? qualifiedDataName+
+    ;
+
+sortDuplicatesPhrase
+    : WITH? DUPLICATES IN? ORDER?
+    ;
+
+sortCollatingSequencePhrase
+    : COLLATING? SEQUENCE IS? alphabetName+ sortCollatingAlphanumeric? sortCollatingNational?
+    ;
+
+sortCollatingAlphanumeric
+    : FOR? ALPHANUMERIC IS alphabetName
+    ;
+
+sortCollatingNational
+    : FOR? NATIONAL IS? alphabetName
+    ;
+
+sortInputProcedurePhrase
+    : INPUT PROCEDURE IS? procedureName sortInputThrough?
+    ;
+
+sortInputThrough
+    : (THROUGH | THRU) procedureName
+    ;
+
+sortUsing
+    : USING fileName+
+    ;
+
+sortOutputProcedurePhrase
+    : OUTPUT PROCEDURE IS? procedureName sortOutputThrough?
+    ;
+
+sortOutputThrough
+    : (THROUGH | THRU) procedureName
+    ;
+
+sortGivingPhrase
+    : GIVING sortGiving+
+    ;
+
+sortGiving
+    : fileName (LOCK | SAVE | NO REWIND | CRUNCH | RELEASE | WITH REMOVE CRUNCH)?
+    ;
+
+// use statement
+
+useStatement
+    : USE (useAfterClause | useDebugClause)
+    ;
+
+useAfterClause
+    : GLOBAL? AFTER STANDARD? (EXCEPTION | ERROR) PROCEDURE ON? GENERIC_WORD? useAfterOn
+    ;
+
+useAfterOn
+    : INPUT
+    | OUTPUT
+    | I_O
+    | EXTEND
+    | fileName+
+    ;
+
+useDebugClause
+    : FOR? DEBUGGING ON? useDebugOn+
+    ;
+
+useDebugOn
+    : ALL PROCEDURES
+    | ALL REFERENCES? OF? identifier
+    | procedureName
+    | fileName
+    ;
+
+// generic statement
+
+genericStatement
+    : genericStatementText+
+    ;
+
+genericStatementText
+    : reservedWord
+    | execSqlStatement
+    | cobolWord
+    | literal
     | GENERIC_WORD
-    | LINAGE_COUNTER
     ;
 
-conditionNameReference
-    : conditionName (inSection* conditionNameSubscriptReference*)
-    ;
-
-conditionName
-    : cobolWord
-    | GENERIC_WORD
-    ;
-
-conditionNameSubscriptReference
-    : LPARENCHAR subscript_ (COMMACHAR? subscript_)* RPARENCHAR
-    ;
-
-subscript_
-    : GENERIC_WORD
-    | integerLiteral
-    | arithmeticExpression
-    ;
-
-
-// relation ----------------------------------
-
-relationCondition
-    : relationSignCondition
-    | relationArithmeticComparison
-    | relationCombinedComparison
-    ;
-
-relationSignCondition
-    : arithmeticExpression IS? NOT? (POSITIVE | NEGATIVE | ZERO)
-    ;
-
-relationArithmeticComparison
-    : arithmeticExpression relationalOperator arithmeticExpression
-    ;
-
-relationCombinedComparison
-    : arithmeticExpression relationalOperator LPARENCHAR relationCombinedCondition RPARENCHAR
-    ;
-
-relationCombinedCondition
-    : arithmeticExpression ((AND | OR) arithmeticExpression)+
-    ;
+// arithmetic expression ----------------------------------
 
 arithmeticExpression
     : multDivs plusMinus*
@@ -291,11 +390,74 @@ power
 
 basis
     : LPARENCHAR arithmeticExpression RPARENCHAR
-    | integerLiteral
-    | NUMERICLITERAL
-    | NONNUMERICLITERAL
     | identifier
-    | GENERIC_WORD
+    | literal
+    ;
+
+// condition ----------------------------------
+
+condition
+    : combinableCondition andOrCondition*
+    ;
+
+andOrCondition
+    : (AND | OR) (combinableCondition | abbreviation+)
+    ;
+
+combinableCondition
+    : NOT? simpleCondition
+    ;
+
+simpleCondition
+    : LPARENCHAR condition RPARENCHAR
+    | relationCondition
+    | classCondition
+    | conditionNameReference
+    ;
+
+classCondition
+    : identifier IS? NOT? EQUALS? (
+        NUMERIC
+        | ALPHABETIC
+        | ALPHABETIC_LOWER
+        | ALPHABETIC_UPPER
+        | DBCS
+        | KANJI
+        | className
+        | figurativeConstant
+    )
+    ;
+
+conditionNameReference
+    : conditionName (inData* inFile? conditionNameSubscriptReference* | inMnemonic*)
+    ;
+
+conditionNameSubscriptReference
+    : LPARENCHAR subscript_ (COMMACHAR? subscript_)* RPARENCHAR
+    ;
+
+// relation ----------------------------------
+
+relationCondition
+    : relationSignCondition
+    | relationArithmeticComparison
+    | relationCombinedComparison
+    ;
+
+relationSignCondition
+    : arithmeticExpression IS? NOT? (POSITIVE | NEGATIVE | ZERO)
+    ;
+
+relationArithmeticComparison
+    : arithmeticExpression relationalOperator arithmeticExpression
+    ;
+
+relationCombinedComparison
+    : arithmeticExpression relationalOperator LPARENCHAR relationCombinedCondition RPARENCHAR
+    ;
+
+relationCombinedCondition
+    : arithmeticExpression ((AND | OR) arithmeticExpression)+
     ;
 
 relationalOperator
@@ -316,24 +478,155 @@ abbreviation
     )
     ;
 
-ifThen
-    : THEN? statement+
+// identifier ----------------------------------
+
+identifier
+    : qualifiedDataName
+    | tableCall
+    | functionCall
+    | specialRegister
+    | cobolWord WS_SUBSCRIPT
     ;
 
-ifElse
-    : ELSE statement+
+tableCall
+    : qualifiedDataName (LPARENCHAR subscript_ (COMMACHAR? subscript_)* RPARENCHAR)* referenceModifier?
     ;
 
-performStatement
-    : PERFORM (performInlineStatement | performProcedureStatement)
+functionCall
+    : FUNCTION functionName (LPARENCHAR argument (COMMACHAR? argument)* RPARENCHAR)* referenceModifier?
     ;
 
-performInlineStatement
-    : performType statement* END_PERFORM
+referenceModifier
+    : LPARENCHAR characterPosition COLONCHAR length? RPARENCHAR
     ;
 
-performProcedureStatement
-    : procedureName ((THROUGH | THRU) procedureName)? performType?
+characterPosition
+    : arithmeticExpression
+    ;
+
+length
+    : arithmeticExpression
+    ;
+
+subscript_
+    : ALL
+    | integerLiteral
+    | qualifiedDataName integerLiteral?
+    | indexName integerLiteral?
+    | arithmeticExpression
+    ;
+
+argument
+    : literal
+    | identifier
+    | qualifiedDataName integerLiteral?
+    | indexName integerLiteral?
+    | arithmeticExpression
+    ;
+
+// qualified data name ----------------------------------
+
+qualifiedDataName
+    : qualifiedDataNameFormat1
+    | qualifiedDataNameFormat2
+    | qualifiedDataNameFormat3
+    | qualifiedDataNameFormat4
+    ;
+
+qualifiedDataNameFormat1
+    : (dataName | conditionName) (qualifiedInData+ inFile? | inFile)?
+    ;
+
+qualifiedDataNameFormat2
+    : paragraphName inSection
+    ;
+
+qualifiedDataNameFormat3
+    : textName inLibrary
+    ;
+
+qualifiedDataNameFormat4
+    : LINAGE_COUNTER inFile
+    ;
+
+qualifiedInData
+    : inData
+    | inTable
+    ;
+
+// in ----------------------------------
+
+inData
+    : (IN | OF) dataName
+    ;
+
+inFile
+    : (IN | OF) fileName
+    ;
+
+inMnemonic
+    : (IN | OF) mnemonicName
+    ;
+
+inSection
+    : (IN | OF) sectionName
+    ;
+
+inLibrary
+    : (IN | OF) libraryName
+    ;
+
+inTable
+    : (IN | OF) tableCall
+    ;
+
+// names ----------------------------------
+
+alphabetName
+    : cobolWord
+    ;
+
+className
+    : cobolWord
+    ;
+
+conditionName
+    : cobolWord
+    | GENERIC_WORD
+    ;
+
+dataName
+    : cobolWord
+    | GENERIC_WORD
+    ;
+
+fileName
+    : cobolWord
+    ;
+
+functionName
+    : INTEGER
+    | LENGTH
+    | RANDOM
+    | SUM
+    | WHEN_COMPILED
+    | cobolWord
+    ;
+
+indexName
+    : cobolWord
+    ;
+
+libraryName
+    : cobolWord
+    ;
+
+mnemonicName
+    : cobolWord
+    ;
+
+paragraphName
+    : NAME_IDENTIFIER
     ;
 
 procedureName
@@ -341,148 +634,424 @@ procedureName
     | sectionName
     ;
 
-inSection
-    : (IN | OF) sectionName
+programName
+    : NONNUMERICLITERAL
+    | cobolWord
     ;
 
 sectionName
-    : GENERIC_WORD
-    | INTEGERLITERAL
-    | IDENTIFIER
+    : NAME_IDENTIFIER
+    | cobolWord
+    | integerLiteral
     ;
 
-performType
-    : performTimes
-    | performUntil
-    | performVarying
+textName
+    : cobolWord
     ;
 
-performTimes
-    : (identifier | integerLiteral) TIMES
-    ;
+// literal ----------------------------------
 
-integerLiteral
-    : INTEGERLITERAL
-    ;
-
-performUntil
-    : performTestClause? UNTIL condition
-    ;
-
-performVarying
-    : performTestClause performVaryingClause
-    | performVaryingClause performTestClause?
-    ;
-
-performVaryingClause
-    : VARYING performVaryingPhrase performAfter*
-    ;
-
-performVaryingPhrase
-    : GENERIC_WORD performFrom performBy performUntil
-    ;
-
-performAfter
-    : AFTER performVaryingPhrase
-    ;
-
-performFrom
-    : FROM (identifier | GENERIC_WORD | NONNUMERICLITERAL | NUMERICLITERAL | arithmeticExpression)
-    ;
-
-performBy
-    : BY (identifier | GENERIC_WORD | NONNUMERICLITERAL | NUMERICLITERAL | arithmeticExpression)
-    ;
-
-performTestClause
-    : WITH? TEST (BEFORE | AFTER)
-    ;
-
-genericStatement
-    : genericText+
+genericText
+    : reservedWord DOT_FS?
+    | execSqlStatement DOT_FS?
+    | cobolWord DOT_FS?
+    | literal DOT_FS?
+    | GENERIC_WORD DOT_FS?
     ;
 
 cobolWord
+    : IDENTIFIER
+    | COBOL
+    | PROGRAM
+    | ABORT
+    | AS
+    | ASCII
+    | ASSOCIATED_DATA
+    | ASSOCIATED_DATA_LENGTH
+    | ATTRIBUTE
+    | AUTO
+    | AUTO_SKIP
+    | BACKGROUND_COLOR
+    | BACKGROUND_COLOUR
+    | BEEP
+    | BELL
+    | BINARY
+    | BIT
+    | BLINK
+    | BOUNDS
+    | CAPABLE
+    | CCSVERSION
+    | CHANGED
+    | CHANNEL
+    | CLOSE_DISPOSITION
+    | COMMITMENT
+    | CONTROL_POINT
+    | CONVENTION
+    | CRUNCH
+    | CURSOR
+    | DEFAULT
+    | DEFAULT_DISPLAY
+    | DEFINITION
+    | DFHRESP
+    | DFHVALUE
+    | DISK
+    | DONTCARE
+    | DOUBLE
+    | EBCDIC
+    | EMPTY_CHECK
+    | ENTER
+    | ENTRY_PROCEDURE
+    | EOL
+    | EOS
+    | ERASE
+    | ESCAPE
+    | EVENT
+    | EXCLUSIVE
+    | EXPORT
+    | EXTENDED
+    | FOREGROUND_COLOR
+    | FOREGROUND_COLOUR
+    | FULL
+    | FUNCTIONNAME
+    | FUNCTION_POINTER
+    | GRID
+    | HIGHLIGHT
+    | IMPLICIT
+    | IMPORT
+    | INTEGER
+    | KEPT
+    | KEYBOARD
+    | LANGUAGE
+    | LB
+    | LD
+    | LEFTLINE
+    | LENGTH_CHECK
+    | LIBACCESS
+    | LIBPARAMETER
+    | LIBRARY
+    | LIST
+    | LOCAL
+    | LONG_DATE
+    | LONG_TIME
+    | LOWER
+    | LOWLIGHT
+    | MMDDYYYY
+    | NAMED
+    | NATIONAL
+    | NATIONAL_EDITED
+    | NETWORK
+    | NO_ECHO
+    | NUMERIC_DATE
+    | NUMERIC_TIME
+    | ODT
+    | ORDERLY
+    | OVERLINE
+    | OWN
+    | PASSWORD
+    | PORT
+    | PRINTER
+    | PRIVATE
+    | PROCESS
+    | PROMPT
+    | READER
+    | REAL
+    | RECEIVED
+    | RECURSIVE
+    | REF
+    | REMOTE
+    | REMOVE
+    | REQUIRED
+    | REVERSE_VIDEO
+    | SAVE
+    | SECURE
+    | SHARED
+    | SHAREDBYALL
+    | SHAREDBYRUNUNIT
+    | SHARING
+    | SHORT_DATE
+    | SYMBOL
+    | TASK
+    | THREAD
+    | THREAD_LOCAL
+    | TIMER
+    | TODAYS_DATE
+    | TODAYS_NAME
+    | TRUNCATED
+    | TYPEDEF
+    | UNDERLINE
+    | VIRTUAL
+    | WAIT
+    | YEAR
+    | YYYYMMDD
+    | YYYYDDD
+    | ZERO_FILL
+    ;
+
+reservedWord
     : ADD
+    | ADDRESS
+    | ALL
+    | ALPHABETIC
+    | ALPHABETIC_LOWER
+    | ALPHABETIC_UPPER
+    | ALPHANUMERIC
     | AND
     | ANY
     | AFTER
     | ARE
+    | ASCENDING
     | ASTERISKCHAR
     | BEFORE
     | BY
     | CALL
     | CHAINING
+    | COLLATING
+    | COLONCHAR
+    | COMMENTTAG
     | COMMACHAR
     | COMPUTE
     | DATA
+    | DATE
+    | DAY
+    | DAY_OF_WEEK
+    | DBCS
+    | DEBUG_CONTENTS
+    | DEBUG_ITEM
+    | DEBUG_LINE
+    | DEBUG_NAME
+    | DEBUG_SUB_1
+    | DEBUG_SUB_2
+    | DEBUG_SUB_3
+    | DEBUGGING
+    | DEPENDING
+    | DESCENDING
     | DISPLAY
     | DIVIDE
     | DOUBLEASTERISKCHAR
     | DOT
+    | DUPLICATES
     | EQUALS
+    | END
+    | EVALUATE
+    | ERROR
     | EQUALCHAR
     | EQUAL
-    | EVALUATE
-    | FUNCTION
+    | EXCEPTION
+    | EXTEND
+    | FOR
     | FROM
+    | FUNCTION
     | GIVING
+    | GLOBAL
     | GREATER
-    | ID
-    | IDENTIFICATION
     | IN
+    | INPUT
     | INITIALIZE
     | IS
+    | I_O
+    | KANJI
+    | KEY
+    | LENGTH
     | LESS
     | LESSTHANCHAR
     | LESSTHANOREQUAL
     | LINAGE_COUNTER
+    | LINE_COUNTER
+    | LOCK
     | LPARENCHAR
     | MINUSCHAR
+    | MORE_LABELS
     | MORETHANCHAR
     | MORETHANOREQUAL
     | MOVE
     | MULTIPLY
     | NEGATIVE
+    | NO
     | NOT
     | NOTEQUALCHAR
+    | NUMERIC
     | OF
+    | ON
     | OPTIONAL
     | OR
-    | POSITIVE
+    | ORDER
+    | OUTPUT
+    | PAGE_COUNTER
     | PLUSCHAR
-    | RETURNING
+    | POSITIVE
     | PROCEDURE
+    | PROCEDURES
+    | PROCEED
+    | RANDOM
     | REFERENCE
+    | REFERENCES
+    | RELEASE
+    | RETURNING
+    | RETURN_CODE
+    | REWIND
     | RPARENCHAR
     | SECTION
+    | SEQUENCE
     | SET
+    | SHIFT_IN
+    | SHIFT_OUT
     | SLASHCHAR
+    | SORT_CONTROL
+    | SORT_CORE_SIZE
+    | SORT_FILE_SIZE
+    | SORT_MESSAGE
+    | SORT_MODE_SIZE
+    | SORT_RETURN
+    | STANDARD
     | STRING
     | SUBTRACT
     | SUM
     | TALLY
     | TALLYING
-    | THAN
     | TEST
-    | THEN
+    | THAN
     | THROUGH
     | THRU
+    | TIME
     | TIMES
     | TO
     | USE
-    | USING
     | UNSTRING
     | UNTIL
+    | USING
     | VALUE
     | VARYING
+    | WHEN_COMPILED
     | WITH
     | WRITE
+    | WS_SUBSCRIPT
+    ;
+
+literal
+    : NONNUMERICLITERAL
+    | figurativeConstant
+    | numericLiteral
+    | booleanLiteral
+    | cicsDfhRespLiteral
+    | cicsDfhValueLiteral
+    ;
+
+booleanLiteral
+    : TRUE
+    | FALSE
+    ;
+
+numericLiteral
+    : NUMERICLITERAL
     | ZERO
+    | integerLiteral
+    ;
+
+integerLiteral
+    : INTEGERLITERAL
+    | LEVEL_NUMBER_66
+    | LEVEL_NUMBER_77
+    | LEVEL_NUMBER_88
+    ;
+
+cicsDfhRespLiteral
+    : DFHRESP LPARENCHAR (cobolWord | literal) RPARENCHAR
+    ;
+
+cicsDfhValueLiteral
+    : DFHVALUE LPARENCHAR (cobolWord | literal) RPARENCHAR
+    ;
+
+// keywords ----------------------------------
+
+figurativeConstant
+    : ALL literal
+    | HIGH_VALUE
+    | HIGH_VALUES
+    | LOW_VALUE
+    | LOW_VALUES
+    | NULL_
+    | NULLS
+    | QUOTE
+    | QUOTES
+    | SPACE
+    | SPACES
+    | ZERO
+    | ZEROS
+    | ZEROES
+    ;
+
+specialRegister
+    : ADDRESS OF identifier
+    | DATE
+    | DAY
+    | DAY_OF_WEEK
+    | DEBUG_CONTENTS
+    | DEBUG_ITEM
+    | DEBUG_LINE
+    | DEBUG_NAME
+    | DEBUG_SUB_1
+    | DEBUG_SUB_2
+    | DEBUG_SUB_3
+    | LENGTH OF? identifier
+    | LINAGE_COUNTER
+    | LINE_COUNTER
+    | PAGE_COUNTER
+    | RETURN_CODE
+    | SHIFT_IN
+    | SHIFT_OUT
+    | SORT_CONTROL
+    | SORT_CORE_SIZE
+    | SORT_FILE_SIZE
+    | SORT_MESSAGE
+    | SORT_MODE_SIZE
+    | SORT_RETURN
+    | TALLY
+    | TIME
+    | WHEN_COMPILED
+    ;
+
+// lexer rules --------------------------------------------------------------------------------
+
+// keywords
+ABORT
+    : A B O R T
     ;
 
 ADD
     : A D D
+    ;
+
+ADDRESS
+    : A D D R E S S
+    ;
+
+AFTER
+    : A F T E R
+    ;
+
+ALL
+    : A L L
+    ;
+
+ALPHABETIC
+    : A L P H A B E T I C
+    ;
+
+ALPHABETIC_LOWER
+    : A L P H A B E T I C MINUSCHAR L O W E R
+    ;
+
+ALPHABETIC_UPPER
+    : A L P H A B E T I C MINUSCHAR U P P E R
+    ;
+
+ALPHANUMERIC
+    : A L P H A N U M E R I C
+    ;
+
+ALTER
+    : A L T E R
     ;
 
 AND
@@ -493,20 +1062,76 @@ ANY
     : A N Y
     ;
 
-AFTER
-    : A F T E R
-    ;
-
 ARE
     : A R E
     ;
 
-ASTERISKCHAR
-    : '*'
+AS
+    : A S
+    ;
+
+ASCENDING
+    : A S C E N D I N G
+    ;
+
+ASCII
+    : A S C I I
+    ;
+
+ASSOCIATED_DATA
+    : A S S O C I A T E D MINUSCHAR D A T A
+    ;
+
+ASSOCIATED_DATA_LENGTH
+    : A S S O C I A T E D MINUSCHAR D A T A MINUSCHAR L E N G T H
+    ;
+
+ATTRIBUTE
+    : A T T R I B U T E
+    ;
+
+AUTO
+    : A U T O
+    ;
+
+AUTO_SKIP
+    : A U T O MINUSCHAR S K I P
+    ;
+
+BACKGROUND_COLOR
+    : B A C K G R O U N D MINUSCHAR C O L O R
+    ;
+
+BACKGROUND_COLOUR
+    : B A C K G R O U N D MINUSCHAR C O L O U R
+    ;
+
+BEEP
+    : B E E P
     ;
 
 BEFORE
     : B E F O R E
+    ;
+
+BELL
+    : B E L L
+    ;
+
+BINARY
+    : B I N A R Y
+    ;
+
+BIT
+    : B I T
+    ;
+
+BLINK
+    : B L I N K
+    ;
+
+BOUNDS
+    : B O U N D S
     ;
 
 BY
@@ -517,28 +1142,152 @@ CALL
     : C A L L
     ;
 
+CAPABLE
+    : C A P A B L E
+    ;
+
+CCSVERSION
+    : C C S V E R S I O N
+    ;
+
 CHAINING
     : C H A I N I N G
     ;
 
-COMMACHAR
-    : ','
+CHANGED
+    : C H A N G E D
+    ;
+
+CHANNEL
+    : C H A N N E L
+    ;
+
+CLOSE_DISPOSITION
+    : C L O S E MINUSCHAR D I S P O S I T I O N
+    ;
+
+COBOL
+    : C O B O L
+    ;
+
+COLLATING
+    : C O L L A T I N G
+    ;
+
+COMMITMENT
+    : C O M M I T M E N T
     ;
 
 COMPUTE
     : C O M P U T E
     ;
 
+CONTROL_POINT
+    : C O N T R O L MINUSCHAR P O I N T
+    ;
+
+CONVENTION
+    : C O N V E N T I O N
+    ;
+
+CRUNCH
+    : C R U N C H
+    ;
+
+CURSOR
+    : C U R S O R
+    ;
+
 DATA
     : D A T A
+    ;
+
+DATE
+    : D A T E
+    ;
+
+DAY
+    : D A Y
+    ;
+
+DAY_OF_WEEK
+    : D A Y MINUSCHAR O F MINUSCHAR W E E K
+    ;
+
+DBCS
+    : D B C S
+    ;
+
+DEBUG_CONTENTS
+    : D E B U G MINUSCHAR C O N T E N T S
+    ;
+
+DEBUG_ITEM
+    : D E B U G MINUSCHAR I T E M
+    ;
+
+DEBUG_LINE
+    : D E B U G MINUSCHAR L I N E
+    ;
+
+DEBUG_NAME
+    : D E B U G MINUSCHAR N A M E
+    ;
+
+DEBUG_SUB_1
+    : D E B U G MINUSCHAR S U B MINUSCHAR '1'
+    ;
+
+DEBUG_SUB_2
+    : D E B U G MINUSCHAR S U B MINUSCHAR '2'
+    ;
+
+DEBUG_SUB_3
+    : D E B U G MINUSCHAR S U B MINUSCHAR '3'
+    ;
+
+DEBUGGING
+    : D E B U G G I N G
     ;
 
 DECLARATIVES
     : D E C L A R A T I V E S
     ;
 
+DEFAULT
+    : D E F A U L T
+    ;
+
+DESCENDING
+    : D E S C E N D I N G
+    ;
+
 DISPLAY
     : D I S P L A Y
+    ;
+
+DEFAULT_DISPLAY
+    : D E F A U L T MINUSCHAR D I S P L A Y
+    ;
+
+DEFINITION
+    : D E F I N I T I O N
+    ;
+
+DEPENDING
+    : D E P E N D I N G
+    ;
+
+DFHRESP
+    : D F H R E S P
+    ;
+
+DFHVALUE
+    : D F H V A L U E
+    ;
+
+DISK
+    : D I S K
     ;
 
 DIVIDE
@@ -549,42 +1298,168 @@ DIVISION
     : D I V I S I O N
     ;
 
-DOUBLEASTERISKCHAR
-    : '**'
+DONTCARE
+    : D O N T C A R E
     ;
 
-DOT
-    : '.'
+DOUBLE
+    : D O U B L E
     ;
 
-// period full stop
-DOT_FS
-    : '.' ('\r' | '\n' | '\f' | '\t' | ' ')+
-    | '.' EOF
+DUPLICATES
+    : D U P L I C A T E S
     ;
 
-EQUALS
-    : E Q U A L S
+EBCDIC
+    : E B C D I C
     ;
 
-EXECSQLLINE
-    : 'EXEC SQL' .*? 'END-EXEC'
+EMPTY_CHECK
+    : E M P T Y MINUSCHAR C H E C K
+    ;
+
+END
+    : E N D
+    ;
+
+END_PERFORM
+    : E N D MINUSCHAR P E R F O R M
+    ;
+
+ENTER
+    : E N T E R
+    ;
+
+ENTRY_PROCEDURE
+    : E N T R Y MINUSCHAR P R O C E D U R E
     ;
 
 ENVIRONMENT
     : E N V I R O N M E N T
     ;
 
+EOL
+    : E O L
+    ;
+
+EOS
+    : E O S
+    ;
+
+EQUALS
+    : E Q U A L S
+    ;
+
+ERASE
+    : E R A S E
+    ;
+
+ESCAPE
+    : E S C A P E
+    ;
+
+EVENT
+    : E V E N T
+    ;
+
 EVALUATE
     : E V A L U A T E
+    ;
+
+ERROR
+    : E R R O R
+    ;
+
+EQUAL
+    : E Q U A L
+    ;
+
+EXCEPTION
+    : E X C E P T I O N
+    ;
+
+EXCLUSIVE
+    : E X C L U S I V E
+    ;
+
+EXPORT
+    : E X P O R T
+    ;
+
+EXTEND
+    : E X T E N D
+    ;
+
+EXTENDED
+    : E X T E N D E D
+    ;
+
+FALSE
+    : F A L S E
+    ;
+
+FOR
+    : F O R
+    ;
+
+FOREGROUND_COLOR
+    : F O R E G R O U N D MINUSCHAR C O L O R
+    ;
+
+FOREGROUND_COLOUR
+    : F O R E G R O U N D MINUSCHAR C O L O U R
+    ;
+
+FULL
+    : F U L L
     ;
 
 FROM
     : F R O M
     ;
 
+FUNCTION
+    : F U N C T I O N
+    ;
+
+FUNCTIONNAME
+    : F U N C T I O N N A M E
+    ;
+
+FUNCTION_POINTER
+    : F U N C T I O N MINUSCHAR P O I N T E R
+    ;
+
+GIVING
+    : G I V I N G
+    ;
+
+GLOBAL
+    : G L O B A L
+    ;
+
+GO
+    : G O
+    ;
+
 GREATER
     : G R E A T E R
+    ;
+
+GRID
+    : G R I D
+    ;
+
+HIGHLIGHT
+    : H I G H L I G H T
+    ;
+
+HIGH_VALUE
+    : H I G H MINUSCHAR V A L U E
+    ;
+
+HIGH_VALUES
+    : H I G H MINUSCHAR V A L U E S
     ;
 
 ID
@@ -595,84 +1470,148 @@ IDENTIFICATION
     : I D E N T I F I C A T I O N
     ;
 
+IMPLICIT
+    : I M P L I C I T
+    ;
+
+IMPORT
+    : I M P O R T
+    ;
+
 IN
     : I N
+    ;
+
+INPUT
+    : I N P U T
     ;
 
 INITIALIZE
     : I N I T I A L I Z E
     ;
 
+INTEGER
+    : I N T E G E R
+    ;
+
 IS
     : I S
     ;
 
-END
-    : E N D
+I_O
+    : I MINUSCHAR O
     ;
 
-END_IF
-    : E N D MINUSCHAR I F
+KANJI
+    : K A N J I
     ;
 
-END_PERFORM
-    : E N D MINUSCHAR P E R F O R M
+KEPT
+    : K E P T
     ;
 
-ELSE
-    : E L S E
+KEY
+    : K E Y
     ;
 
-EQUALCHAR
-    : '='
+KEYBOARD
+    : K E Y B O A R D
     ;
 
-EQUAL
-    : E Q U A L
+LANGUAGE
+    : L A N G U A G E
     ;
 
-FUNCTION
-    : F U N C T I O N
+LB
+    : L B
     ;
 
-GIVING
-    : G I V I N G
+LD
+    : L D
     ;
 
-IF
-    : I F
+LEFTLINE
+    : L E F T L I N E
+    ;
+
+LENGTH
+    : L E N G T H
+    ;
+
+LENGTH_CHECK
+    : L E N G T H MINUSCHAR C H E C K
     ;
 
 LESS
     : L E S S
     ;
 
-LESSTHANCHAR
-    : '<'
+LIBACCESS
+    : L I B A C C E S S
     ;
 
-LESSTHANOREQUAL
-    : '<='
+LIBPARAMETER
+    : L I B P A R A M E T E R
+    ;
+
+LIBRARY
+    : L I B R A R Y
     ;
 
 LINAGE_COUNTER
     : L I N A G E MINUSCHAR C O U N T E R
     ;
 
-LPARENCHAR
-    : '('
+LINE_COUNTER
+    : L I N E MINUSCHAR C O U N T E R
     ;
 
-MINUSCHAR
-    : '-'
+LIST
+    : L I S T
     ;
 
-MORETHANCHAR
-    : '>'
+LOCAL
+    : L O C A L
     ;
 
-MORETHANOREQUAL
-    : '>='
+LOCK
+    : L O C K
+    ;
+
+LONG_DATE
+    : L O N G MINUSCHAR D A T E
+    ;
+
+LONG_TIME
+    : L O N G MINUSCHAR T I M E
+    ;
+
+LOW_VALUE
+    : L O W MINUSCHAR V A L U E
+    ;
+
+LOW_VALUES
+    : L O W MINUSCHAR V A L U E S
+    ;
+
+LOWER
+    : L O W E R
+    ;
+
+LOWLIGHT
+    : L O W L I G H T
+    ;
+
+MERGE
+    : M E R G E
+    ;
+
+MMDDYYYY
+    : M M D D Y Y Y Y
+    ;
+
+MORE_LABELS
+    : M O R E MINUSCHAR L A B E L S
     ;
 
 MOVE
@@ -687,16 +1626,64 @@ NEGATIVE
     : N E G A T I V E
     ;
 
+NAMED
+    : N A M E D
+    ;
+
+NATIONAL
+    : N A T I O N A L
+    ;
+
+NATIONAL_EDITED
+    : N A T I O N A L MINUSCHAR E D I T E D
+    ;
+
+NETWORK
+    : N E T W O R K
+    ;
+
+NO_ECHO
+    : N O MINUSCHAR E C H O
+    ;
+
+NO
+    : N O
+    ;
+
 NOT
     : N O T
     ;
 
-NOTEQUALCHAR
-    : '<>'
+NULL_
+    : N U L L
+    ;
+
+NULLS
+    : N U L L S
+    ;
+
+NUMERIC
+    : N U M E R I C
+    ;
+
+NUMERIC_DATE
+    : N U M E R I C MINUSCHAR D A T E
+    ;
+
+NUMERIC_TIME
+    : N U M E R I C MINUSCHAR T I M E
     ;
 
 OF
     : O F
+    ;
+
+ODT
+    : O D T
+    ;
+
+ON
+    : O N
     ;
 
 OPTIONAL
@@ -707,44 +1694,236 @@ OR
     : O R
     ;
 
-PLUSCHAR
-    : '+'
+ORDER
+    : O R D E R
+    ;
+
+ORDERLY
+    : O R D E R L Y
+    ;
+
+QUOTE
+    : Q U O T E
+    ;
+
+QUOTES
+    : Q U O T E S
+    ;
+
+OUTPUT
+    : O U T P U T
+    ;
+
+OVERLINE
+    : O V E R L I N E
+    ;
+
+OWN
+    : O W N
+    ;
+
+PAGE_COUNTER
+    : P A G E MINUSCHAR C O U N T E R
+    ;
+
+PASSWORD
+    : P A S S W O R D
+    ;
+
+PORT
+    : P O R T
     ;
 
 POSITIVE
     : P O S I T I V E
     ;
 
+PRINTER
+    : P R I N T E R
+    ;
+
+PRIVATE
+    : P R I V A T E
+    ;
+
 PROCEDURE
     : P R O C E D U R E
+    ;
+
+PROCEDURES
+    : P R O C E D U R E S
+    ;
+
+PROCEED
+    : P R O C E E D
+    ;
+
+PROCESS
+    : P R O C E S S
+    ;
+
+PROGRAM
+    : P R O G R A M
     ;
 
 PERFORM
     : P E R F O R M
     ;
 
+PROMPT
+    : P R O M P T
+    ;
+
+READER
+    : R E A D E R
+    ;
+
+REAL
+    : R E A L
+    ;
+
+RANDOM
+    : R A N D O M
+    ;
+
+RECEIVED
+    : R E C E I V E D
+    ;
+
+RECURSIVE
+    : R E C U R S I V E
+    ;
+
+REF
+    : R E F
+    ;
+
 REFERENCE
     : R E F E R E N C E
+    ;
+
+REFERENCES
+    : R E F E R E N C E S
+    ;
+
+RELEASE
+    : R E L E A S E
+    ;
+
+REMOTE
+    : R E M O T E
+    ;
+
+REMOVE
+    : R E M O V E
+    ;
+
+REQUIRED
+    : R E Q U I R E D
     ;
 
 RETURNING
     : R E T U R N I N G
     ;
 
-RPARENCHAR
-    : ')'
+RETURN_CODE
+    : R E T U R N MINUSCHAR C O D E
+    ;
+
+REVERSE_VIDEO
+    : R E S E R V E MINUSCHAR V I D E O
+    ;
+
+REWIND
+    : R E W I N D
+    ;
+
+SAVE
+    : S A V E
+    ;
+
+SECURE
+    : S E C U R E
     ;
 
 SECTION
     : S E C T I O N
     ;
 
+SEQUENCE
+    : S E Q U E N C E
+    ;
+
 SET
     : S E T
     ;
 
-SLASHCHAR
-    : '/'
+SHARED
+    : S H A R E D
+    ;
+
+SHAREDBYALL
+    : S H A R E D B Y A L L
+    ;
+
+SHAREDBYRUNUNIT
+    : S H A R E D B Y R U N U N I T
+    ;
+
+SHARING
+    : S H A R I N G
+    ;
+
+SHIFT_IN
+    : S H I F T MINUSCHAR I N
+    ;
+
+SHIFT_OUT
+    : S H I F T MINUSCHAR O U T
+    ;
+
+SHORT_DATE
+    : S H O R T MINUSCHAR D A T E
+    ;
+
+SORT
+    : S O R T
+    ;
+
+SORT_CONTROL
+    : S O R T MINUSCHAR C O N T R O L
+    ;
+
+SORT_CORE_SIZE
+    : S O R T MINUSCHAR C O R E MINUSCHAR S I Z E
+    ;
+
+SORT_FILE_SIZE
+    : S O R T MINUSCHAR F I L E MINUSCHAR S I Z E
+    ;
+
+SORT_MESSAGE
+    : S O R T MINUSCHAR M E S S A G E
+    ;
+
+SORT_MODE_SIZE
+    : S O R T MINUSCHAR M O D E MINUSCHAR S I Z E
+    ;
+
+SORT_RETURN
+    : S O R T MINUSCHAR R E T U R N
+    ;
+
+SPACE
+    : S P A C E
+    ;
+
+SPACES
+    : S P A C E S
+    ;
+
+STANDARD
+    : S T A N D A R D
     ;
 
 STRING
@@ -759,12 +1938,20 @@ SUM
     : S U M
     ;
 
+SYMBOL
+    : S Y M B O L
+    ;
+
 TALLY
     : T A L L Y
     ;
 
 TALLYING
     : T A L L Y I N G
+    ;
+
+TASK
+    : T A S K
     ;
 
 TEST
@@ -775,8 +1962,12 @@ THAN
     : T H A N
     ;
 
-THEN
-    : T H E N
+THREAD
+    : T H R E A D
+    ;
+
+THREAD_LOCAL
+    : T H R E A D MINUSCHAR L O C A L
     ;
 
 THROUGH
@@ -787,12 +1978,44 @@ THRU
     : T H R U
     ;
 
+TIME
+    : T I M E
+    ;
+
+TIMER
+    : T I M E R
+    ;
+
 TIMES
     : T I M E S
     ;
 
 TO
     : T O
+    ;
+
+TODAYS_DATE
+    : T O D A Y S MINUSCHAR D A T E
+    ;
+
+TODAYS_NAME
+    : T O D A Y S MINUSCHAR N A M E
+    ;
+
+TRUE
+    : T R U E
+    ;
+
+TRUNCATED
+    : T R U N C A T E D
+    ;
+
+TYPEDEF
+    : T Y P E D E F
+    ;
+
+UNDERLINE
+    : U N D E R L I N E
     ;
 
 USE
@@ -819,6 +2042,18 @@ VARYING
     : V A R Y I N G
     ;
 
+VIRTUAL
+    : V I R T U A L
+    ;
+
+WAIT
+    : W A I T
+    ;
+
+WHEN_COMPILED
+    : W H E N MINUSCHAR C O M P I L E D
+    ;
+
 WITH
     : W I T H
     ;
@@ -827,45 +2062,115 @@ WRITE
     : W R I T E
     ;
 
+WS_SUBSCRIPT
+    : LPARENCHAR W S MINUSCHAR S U B S C R I P T RPARENCHAR
+    ;
+
+YEAR
+    : Y E A R
+    ;
+
+YYYYMMDD
+    : Y Y Y Y M M D D
+    ;
+
+YYYYDDD
+    : Y Y Y Y D D D
+    ;
+
 ZERO
     : Z E R O
     ;
 
-// whitespace, line breaks, comments, ...
-NEWLINE
-    : '\r'? '\n' -> channel(HIDDEN)
+ZERO_FILL
+    : Z E R O MINUSCHAR F I L L
     ;
 
-WS
-    : [ \t\f;]+ -> channel(HIDDEN)
+ZEROS
+    : Z E R O S
     ;
 
-SEPARATOR
-    : ', ' -> channel(HIDDEN)
+ZEROES
+    : Z E R O E S
     ;
 
-SKIP_COMMENT
-    : '*' ~[\r\n]* [\r\n]+ -> skip
+// symbols
+
+ASTERISKCHAR
+    : '*'
     ;
 
-SKIP_ANOMALY
-    : '/' ('\r'? '\n') -> skip
+COLONCHAR
+    : ':'
     ;
 
-INTEGERLITERAL
-    : (PLUSCHAR | MINUSCHAR)? [0-9]+
+COMMENTTAG
+    : '*>'
     ;
 
-IDENTIFIER
-    : [0-9][0-9][0-9][0-9] [a-zA-Z]* ([-_]+ [A-Z0-9]+)*
+COMMACHAR
+    : ','
     ;
 
-NUMERICLITERAL
-    : (PLUSCHAR | MINUSCHAR)? [0-9]* (DOT | COMMACHAR) [0-9]+ (
-        ('e' | 'E') (PLUSCHAR | MINUSCHAR)? [0-9]+
-    )?
+DOUBLEASTERISKCHAR
+    : '**'
     ;
 
+// period full stop
+DOT_FS
+    : '.' ('\r' | '\n' | '\f' | '\t' | ' ')+
+    | '.' EOF
+    ;
+
+DOT
+    : '.'
+    ;
+
+EQUALCHAR
+    : '='
+    ;
+
+LESSTHANCHAR
+    : '<'
+    ;
+
+LESSTHANOREQUAL
+    : '<='
+    ;
+
+LPARENCHAR
+    : '('
+    ;
+
+MINUSCHAR
+    : '-'
+    ;
+
+MORETHANCHAR
+    : '>'
+    ;
+
+MORETHANOREQUAL
+    : '>='
+    ;
+
+NOTEQUALCHAR
+    : '<>'
+    ;
+
+PLUSCHAR
+    : '+'
+    ;
+
+RPARENCHAR
+    : ')'
+    ;
+
+SLASHCHAR
+    : '/'
+    ;
+
+// literals
 NONNUMERICLITERAL
     : STRINGLITERAL
     | DBCSLITERAL
@@ -891,6 +2196,65 @@ fragment STRINGLITERAL
 fragment DBCSLITERAL
     : [GN] '"' (~["\n\r] | '""' | '\'')* '"'
     | [GN] '\'' (~['\n\r] | '\'\'' | '"')* '\''
+    ;
+
+LEVEL_NUMBER_66
+    : '66'
+    ;
+
+LEVEL_NUMBER_77
+    : '77'
+    ;
+
+LEVEL_NUMBER_88
+    : '88'
+    ;
+
+INTEGERLITERAL
+    : (PLUSCHAR | MINUSCHAR)? [0-9]+
+    ;
+
+NUMERICLITERAL
+    : (PLUSCHAR | MINUSCHAR)? [0-9]* (DOT | COMMACHAR) [0-9]+ (
+        ('e' | 'E') (PLUSCHAR | MINUSCHAR)? [0-9]+
+    )?
+    ;
+
+NAME_IDENTIFIER
+    : [0-9][0-9][0-9]+ [a-zA-Z]* ([-_]+ [a-zA-Z0-9]+)*
+    ;
+
+IDENTIFIER
+    : [a-zA-Z0-9]+ ([-_]+ [a-zA-Z0-9]+)*
+    ;
+
+// whitespace, line breaks, comments, ...
+NEWLINE
+    : '\r'? '\n' -> channel(HIDDEN)
+    ;
+
+EXECSQLLINE
+    : 'EXEC SQL' .*? 'END-EXEC'
+    ;
+
+COMMENTLINE
+    : COMMENTTAG WS ~('\n' | '\r')* -> channel(HIDDEN)
+    ;
+
+WS
+    : [ \t\f;]+ -> channel(HIDDEN)
+    ;
+
+SEPARATOR
+    : ', ' -> channel(HIDDEN)
+    ;
+
+SKIP_COMMENT
+    : '*' ~[\r\n]* [\r\n]+ -> skip
+    ;
+
+SKIP_ANOMALY
+    : '/' ('\r'? '\n') -> skip
     ;
 
 GENERIC_WORD

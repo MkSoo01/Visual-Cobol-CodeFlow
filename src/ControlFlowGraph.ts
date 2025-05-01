@@ -45,6 +45,7 @@ export class ControlFlowGraph {
   private displayNodes: Node[] = [];
   private edges: Edge[] = [];
   private routes: Route[] = [];
+  private dupCallerList: string[] = [];
 
   public getDisplayNodes(): Node[] {
     return [...this.displayNodes];
@@ -82,6 +83,22 @@ export class ControlFlowGraph {
   private removeDisplayNodeByIndex(nodeIndexToRemove: number) {
     if (nodeIndexToRemove !== -1) {
       this.displayNodes.splice(nodeIndexToRemove, 1);
+    }
+  }
+
+  public getDupCallerList(): string[] {
+    return [...this.dupCallerList];
+  }
+
+  public popDupCallerList() {
+    if (this.dupCallerList.length > 0) {
+      this.dupCallerList.pop();
+    }
+  }
+
+  public insertDupCaller(dupCaller: string) {
+    if (dupCaller) {
+      this.dupCallerList.push(dupCaller);
     }
   }
 
@@ -142,8 +159,9 @@ export class ControlFlowGraph {
 
     this.addRawNodes(visitor.getNodes());
     this.generateDisplayNodes();
-    this.generateEdges();
-    return this.generateMermaidGraph(this.displayNodes, this.edges);
+    return "";
+    //this.generateEdges();
+    //return this.generateMermaidGraph(this.displayNodes, this.edges);
   }
 
   private findCalleesOfRemovedNode(
@@ -255,11 +273,22 @@ export class ControlFlowGraph {
         );
         if (calleeNode.callees.length > 0 && !isCallingItself) {
           if (callerNodeIsDup || hasMultipleCaller) {
-            callerNode = this.createDisplayNodesForCallees(
-              calleeNode,
-              [...calleeNode.callees],
-              true
+            const isInfiniteLoop = this.getDupCallerList().includes(
+              calleeNode.id.split("_")[0]
             );
+
+            if (!isInfiniteLoop) {
+              // console.log("insertDupCaller: " + calleeNode.id.split("_")[0]);
+              this.insertDupCaller(calleeNode.id.split("_")[0]);
+              callerNode = this.createDisplayNodesForCallees(
+                calleeNode,
+                [...calleeNode.callees],
+                true
+              );
+
+              // console.log("popDupCaller: " + calleeNode.id.split("_")[0]);
+              this.popDupCallerList();
+            }
           } else {
             callerNode = this.createDisplayNodesForCallees(
               calleeNode,

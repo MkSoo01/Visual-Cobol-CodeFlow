@@ -159,7 +159,6 @@ export class ControlFlowGraph {
 
     this.addRawNodes(visitor.getNodes());
     this.generateDisplayNodes();
-    return "";
     this.generateEdges();
     return this.generateMermaidGraph(this.displayNodes, this.edges);
   }
@@ -337,13 +336,19 @@ export class ControlFlowGraph {
   public generateDisplayNodes() {
     this.processRawNodesForDisplay(this.getRawNodes());
     const startNode = this.getRawNodes()[0];
+    if (!startNode) {
+      throw new Error("Missing start node");
+    }
+
     const startNodeForDisplay = structuredClone(startNode);
     this.displayNodes.push(startNodeForDisplay);
-    this.createDisplayNodesForCallees(
-      startNodeForDisplay,
-      [...startNodeForDisplay.callees],
-      false
-    );
+    if (startNodeForDisplay.callees.length > 0) {
+      this.createDisplayNodesForCallees(
+        startNodeForDisplay,
+        [...startNodeForDisplay.callees],
+        false
+      );
+    }
   }
 
   public generateEdges() {

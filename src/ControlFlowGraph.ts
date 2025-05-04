@@ -144,7 +144,7 @@ export class ControlFlowGraph {
     }
   }
 
-  public generateGraph(fileContent: string): string {
+  private initGraph(fileContent: string) {
     // const fileContent = fs.readFileSync(filePath, "utf-8");
     // const fileContent = fs.readFileSync(
     //   "C:/Users/khims/source/repos/visual-cobol-codeflow/out/test/backtesting-summary.cbl",
@@ -163,7 +163,16 @@ export class ControlFlowGraph {
     this.addRawNodes(visitor.getNodes());
     this.generateDisplayNodes();
     this.generateEdges();
+  }
+
+  public generateGraphInMarkdown(fileContent: string): string {
+    this.initGraph(fileContent);
     return this.generateMermaidGraph(this.displayNodes, this.edges);
+  }
+
+  public generateGraphForCodeFlowDisplay(fileContent: string): string {
+    this.initGraph(fileContent);
+    return this.generateMermaidGraphForDisplay(this.displayNodes, this.edges);
   }
 
   private findCalleesOfRemovedNode(
@@ -390,7 +399,22 @@ export class ControlFlowGraph {
 
   public generateMermaidGraph(nodes: DisplayNode[], edges: Edge[]): string {
     const nodeMap = new Map(
-      nodes.map((n) => [n.id, n.label + " (" + n.startLineNumber + ")"])
+      nodes.map((n) => {
+        // let caller = "";
+        // if (n.type !== NodeType.START) {
+        //   let callerNode = this.getDisplayNodes().find(
+        //     (r) => r.id === n.caller
+        //   );
+        //   while (callerNode?.type === NodeType.LOOP) {
+        //     callerNode = this.getDisplayNodes().find(
+        //       (r) => r.id === callerNode?.caller
+        //     );
+        //   }
+        //   caller = "[" + callerNode?.label.trim() + "] <br> ";
+        // }
+
+        return [n.id, n.label + " (" + n.startLineNumber + ")"];
+      })
     );
     const lines = ["```mermaid", "graph TD"];
     for (const edge of edges) {
@@ -401,6 +425,32 @@ export class ControlFlowGraph {
       );
     }
     lines.push("```");
+    return lines.join("\n");
+  }
+
+  public generateMermaidGraphForDisplay(
+    nodes: DisplayNode[],
+    edges: Edge[]
+  ): string {
+    const clickActionLines: string[] = [];
+    const nodeMap = new Map(
+      nodes.map((n) => {
+        clickActionLines.push(
+          `\t\tclick ${n.id} call focusOn(${n.startLineNumber})`
+        );
+        return [n.id, n.label + " (" + n.startLineNumber + ")"];
+      })
+    );
+
+    const lines = ["\n\tgraph TD"];
+    for (const edge of edges) {
+      const sourceLabel = nodeMap.get(edge.source) ?? edge.source;
+      const targetLabel = nodeMap.get(edge.target) ?? edge.target;
+      lines.push(
+        `\t\t${edge.source}["${sourceLabel}"] --> ${edge.target}["${targetLabel}"]`
+      );
+    }
+    lines.push(...clickActionLines);
     return lines.join("\n");
   }
 }

@@ -25,11 +25,19 @@ function getWebviewHtml(
     </head>
     <body style="
             margin: 0;
+            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             ${bodyStyle}">
-        <pre class="mermaid">
+        <pre class="mermaid" style="height: 100%;
+                                    width: 100%;
+                                    margin: 0;
+                                    padding: 0;
+                                    box-sizing: border-box;
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;">
           ${mermaidGraph}
         </pre>
 

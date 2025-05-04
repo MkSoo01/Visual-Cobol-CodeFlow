@@ -79,7 +79,6 @@ export class ControlFlowVisitor
       endLineNumber: endLineNumber,
       callers: [],
       callees: [],
-      flow: "f1",
     };
   }
 
@@ -126,11 +125,14 @@ export class ControlFlowVisitor
       return;
     }
 
-    const ancestor = this.getAncestor(ctx);
     let caller = undefined;
     let callee = undefined;
-    if (ancestor) {
-      caller = ancestor;
+    if (ctx.performType()) {
+      caller = this.addLoopNode(ctx);
+    } else {
+      caller = this.getAncestor(ctx);
+    }
+    if (caller) {
       callee = ctx.procedureName(0).text;
       this.addEntryToCallerCalleesMap(caller, callee);
     }
@@ -138,15 +140,32 @@ export class ControlFlowVisitor
     this.visitChildren(ctx);
   }
 
-  visitPerformInlineStatement(
-    ctx: VisualCobolParser.PerformInlineStatementContext
-  ): void {
-    const performUntil = ctx.performType()?.performUntil();
-    if (performUntil) {
-      const nodeName =
-        "PERFORM " + this.getLeafNodeTexts(performUntil).join(" ");
+  public addLoopNode(
+    ctx:
+      | VisualCobolParser.PerformProcedureStatementContext
+      | VisualCobolParser.PerformInlineStatementContext
+  ): string {
+    let nodeName;
+    let performTypeInstance;
 
-      let performUntilNode: Node = this.formNode(
+    const performType = ctx.performType();
+    if (performType) {
+      if (performType.performUntil()) {
+        performTypeInstance = performType.performUntil();
+      } else if (performType.performVarying()) {
+        performTypeInstance = performType.performVarying();
+      } else if (performType.performTimes()) {
+        performTypeInstance = performType.performTimes();
+      }
+    }
+
+    if (performTypeInstance) {
+      nodeName =
+        "PERFORM " + this.getLeafNodeTexts(performTypeInstance).join(" ");
+    }
+
+    if (nodeName) {
+      let loopNode: Node = this.formNode(
         ctx.start.line.toString(),
         nodeName,
         NodeType.LOOP,
@@ -156,12 +175,21 @@ export class ControlFlowVisitor
 
       const ancestor = this.getAncestor(ctx);
       if (ancestor) {
-        this.addEntryToCallerCalleesMap(ancestor, performUntilNode.id);
+        this.addEntryToCallerCalleesMap(ancestor, loopNode.id);
       }
 
-      this.addNode(performUntilNode);
-      this.visitChildren(ctx);
+      this.addNode(loopNode);
+      return loopNode.id;
     }
+
+    return "";
+  }
+
+  visitPerformInlineStatement(
+    ctx: VisualCobolParser.PerformInlineStatementContext
+  ): void {
+    this.addLoopNode(ctx);
+    this.visitChildren(ctx);
   }
 
   private getLeafNodeTexts(leafNode: ParseTree): string[] {
@@ -196,7 +224,7 @@ export class ControlFlowVisitor
     if (node.stop && node.stop.type === Token.EOF) {
       const startNode = this.getNodes().find((n) => n.type === NodeType.START);
       if (!startNode) {
-        throw new Error("Missing start or end node");
+        throw new Error("Missing start node");
       }
 
       this.getNodes().forEach((child) => {

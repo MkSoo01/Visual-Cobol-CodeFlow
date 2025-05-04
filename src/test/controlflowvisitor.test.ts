@@ -6,8 +6,10 @@ import {
   PerformInlineStatementContext,
   PerformProcedureStatementContext,
   PerformStatementContext,
+  PerformTimesContext,
   PerformTypeContext,
   PerformUntilContext,
+  PerformVaryingContext,
   ProcedureNameContext,
   SentenceContext,
   StatementContext,
@@ -43,7 +45,6 @@ suite("Tests for Control Flow Visitor", () => {
       endLineNumber: endLineNumber,
       callers: [],
       callees: [],
-      flow: "f1",
     };
   }
 
@@ -131,7 +132,7 @@ suite("Tests for Control Flow Visitor", () => {
     return stubCtx;
   }
 
-  function initPerformInlineStatementCtx(
+  function initPerformInlineForPerformUntil(
     stubPerformInlineStatementCtx: PerformInlineStatementContext,
     performInlineStatementText: string
   ) {
@@ -140,15 +141,63 @@ suite("Tests for Control Flow Visitor", () => {
     stubPerformInlineStatementCtx.performType = () => stubPerformTypeCtx;
     stubPerformTypeCtx.performUntil.returns(stubPerformUntilCtx);
 
-    const textArray = performInlineStatementText.split(" ");
-    textArray.shift();
+    const textArray = performInlineStatementText.split("UNTIL");
     const untilTerminalNode = sinon.createStubInstance(TerminalNode);
-    defineProperty(untilTerminalNode, "text", textArray[0]);
+    defineProperty(untilTerminalNode, "text", "UNTIL");
     const otherTerminalNode = sinon.createStubInstance(TerminalNode);
-    defineProperty(otherTerminalNode, "text", textArray.splice(1).join(" "));
+    defineProperty(
+      otherTerminalNode,
+      "text",
+      textArray.splice(1).join(" ").trim()
+    );
     stubPerformUntilCtx.getChild.withArgs(0).returns(untilTerminalNode);
     stubPerformUntilCtx.getChild.withArgs(1).returns(otherTerminalNode);
     defineProperty(stubPerformUntilCtx, "childCount", 2);
+  }
+
+  function initPerformInlineForPerformVarying(
+    stubPerformInlineStatementCtx: PerformInlineStatementContext,
+    performInlineStatementText: string
+  ) {
+    const stubPerformTypeCtx = sinon.createStubInstance(PerformTypeContext);
+    const stubPerformVaryingCtx = sinon.createStubInstance(
+      PerformVaryingContext
+    );
+    stubPerformInlineStatementCtx.performType = () => stubPerformTypeCtx;
+    stubPerformTypeCtx.performVarying.returns(stubPerformVaryingCtx);
+
+    const textArray = performInlineStatementText.split("VARYING");
+    const varyingTerminalNode = sinon.createStubInstance(TerminalNode);
+    defineProperty(varyingTerminalNode, "text", "VARYING");
+    const otherTerminalNode = sinon.createStubInstance(TerminalNode);
+    defineProperty(
+      otherTerminalNode,
+      "text",
+      textArray.splice(1).join(" ").trim()
+    );
+    stubPerformVaryingCtx.getChild.withArgs(0).returns(varyingTerminalNode);
+    stubPerformVaryingCtx.getChild.withArgs(1).returns(otherTerminalNode);
+    defineProperty(stubPerformVaryingCtx, "childCount", 2);
+  }
+
+  function initPerformInlineForPerformTimes(
+    stubPerformInlineStatementCtx: PerformInlineStatementContext,
+    performInlineStatementText: string
+  ) {
+    const stubPerformTypeCtx = sinon.createStubInstance(PerformTypeContext);
+    const stubPerformTimesCtx = sinon.createStubInstance(PerformTimesContext);
+    stubPerformInlineStatementCtx.performType = () => stubPerformTypeCtx;
+    stubPerformTypeCtx.performTimes.returns(stubPerformTimesCtx);
+
+    const textArray = performInlineStatementText.split(" ");
+    const timesTerminalNode = sinon.createStubInstance(TerminalNode);
+    defineProperty(timesTerminalNode, "text", "TIMES");
+    const otherTerminalNode = sinon.createStubInstance(TerminalNode);
+    defineProperty(otherTerminalNode, "text", textArray[1].trim());
+
+    stubPerformTimesCtx.getChild.withArgs(0).returns(otherTerminalNode);
+    stubPerformTimesCtx.getChild.withArgs(1).returns(timesTerminalNode);
+    defineProperty(stubPerformTimesCtx, "childCount", 2);
   }
 
   test("the start node data to be captured correctly", function () {
@@ -388,6 +437,42 @@ suite("Tests for Control Flow Visitor", () => {
     ).to.have.members([procedureName]);
   });
 
+  test("visitPerformProcedureStatement calls addPerformNode if has performType", function () {
+    const callerNodeName = "0000-MAIN-ROUTINE";
+    const callerStartLineNumber = 235;
+    const callerEndLineNumber = 256;
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
+      callerNodeName,
+      callerStartLineNumber,
+      callerEndLineNumber
+    ) as unknown as ParagraphContext;
+
+    const procedureName = "1000-INIT";
+    const stubCtx = createStubPerformProcedureStatementCtx(
+      procedureName,
+      stubParagraphCtx
+    );
+
+    stubCtx.performType = () => sinon.createStubInstance(PerformTypeContext);
+
+    const addLoopNodeStub = sinon.stub(visitor, "addLoopNode");
+    const loopNodeId = "400";
+    addLoopNodeStub.returns(loopNodeId);
+
+    visitor.visitPerformProcedureStatement(stubCtx);
+
+    expect(
+      visitor.getCalleeToCallersMap().get(procedureName),
+      "Callee To Callers Map"
+    ).to.have.members([loopNodeId]);
+    expect(
+      visitor.getCallerToCalleesMap().get(loopNodeId),
+      "Caller To Callees Map"
+    ).to.have.members([procedureName]);
+    expect(addLoopNodeStub).to.have.been.calledOnce;
+    expect(addLoopNodeStub).to.have.been.calledWith(stubCtx);
+  });
+
   test("visitPerformProcedureStatement call visitChildren once at the end", function () {
     const visitChildrenStub = sinon.stub(visitor, "visitChildren");
 
@@ -411,7 +496,7 @@ suite("Tests for Control Flow Visitor", () => {
     expect(visitChildrenStub).to.have.been.calledOnce;
   });
 
-  test("the loop node data to be captured correctly", function () {
+  test("the loop node data to be captured correctly for PERFORM UNTIL", function () {
     const expectedNodeName = "PERFORM UNTIL SQLCODE = CC-NOT-FOUND";
     const expectedStartLineNumber = 245;
     const expectedEndLineNumber = 253;
@@ -424,7 +509,7 @@ suite("Tests for Control Flow Visitor", () => {
       expectedEndLineNumber
     ) as PerformInlineStatementContext;
 
-    initPerformInlineStatementCtx(
+    initPerformInlineForPerformUntil(
       stubPerformInlineStatementCtx,
       expectedNodeName
     );
@@ -460,6 +545,129 @@ suite("Tests for Control Flow Visitor", () => {
     );
   });
 
+  test("the loop node data to be captured correctly for PERFORM VARYING", function () {
+    const expectedNodeName =
+      "PERFORM VARYING WS-CTR-3 FROM 1 BY 1 UNTIL WS-CTR-3 > WS-TMP-COUNT";
+    const expectedStartLineNumber = 245;
+    const expectedEndLineNumber = 253;
+    const expectedNodeId = expectedStartLineNumber.toString();
+
+    const stubPerformInlineStatementCtx = createStubParserRuleCtx(
+      sinon.createStubInstance(PerformInlineStatementContext),
+      "",
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    ) as PerformInlineStatementContext;
+
+    initPerformInlineForPerformVarying(
+      stubPerformInlineStatementCtx,
+      expectedNodeName
+    );
+
+    const caller = "1000-INIT";
+    const callerStartLineNumber = 100;
+    const callerEndLineNumber = 200;
+    const callerID = callerStartLineNumber.toString();
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
+      caller,
+      callerStartLineNumber,
+      callerEndLineNumber
+    ) as ParagraphContext;
+    setParent(stubPerformInlineStatementCtx, stubParagraphCtx);
+
+    visitor.visitPerformInlineStatement(stubPerformInlineStatementCtx);
+
+    const actual = visitor.getNodes()[0];
+    const expected = formNode(
+      expectedNodeId,
+      expectedNodeName,
+      NodeType.LOOP,
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    );
+
+    expect(actual).to.deep.equal(expected);
+    expect(visitor.getCallerToCalleesMap().get(callerID)).to.have.members([
+      expectedNodeId,
+    ]);
+    expect(visitor.getCalleeToCallersMap().get(expectedNodeId)).to.have.members(
+      [callerID]
+    );
+  });
+
+  test("the loop node data to be captured correctly for PERFORM TIMES", function () {
+    const expectedNodeName = "PERFORM 2 TIMES";
+    const expectedStartLineNumber = 245;
+    const expectedEndLineNumber = 253;
+    const expectedNodeId = expectedStartLineNumber.toString();
+
+    const stubPerformInlineStatementCtx = createStubParserRuleCtx(
+      sinon.createStubInstance(PerformInlineStatementContext),
+      "",
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    ) as PerformInlineStatementContext;
+
+    initPerformInlineForPerformTimes(
+      stubPerformInlineStatementCtx,
+      expectedNodeName
+    );
+
+    const caller = "1000-INIT";
+    const callerStartLineNumber = 100;
+    const callerEndLineNumber = 200;
+    const callerID = callerStartLineNumber.toString();
+    const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
+      caller,
+      callerStartLineNumber,
+      callerEndLineNumber
+    ) as ParagraphContext;
+    setParent(stubPerformInlineStatementCtx, stubParagraphCtx);
+
+    visitor.visitPerformInlineStatement(stubPerformInlineStatementCtx);
+
+    const actual = visitor.getNodes()[0];
+    const expected = formNode(
+      expectedNodeId,
+      expectedNodeName,
+      NodeType.LOOP,
+      expectedStartLineNumber,
+      expectedEndLineNumber
+    );
+
+    expect(actual).to.deep.equal(expected);
+    expect(visitor.getCallerToCalleesMap().get(callerID)).to.have.members([
+      expectedNodeId,
+    ]);
+    expect(visitor.getCalleeToCallersMap().get(expectedNodeId)).to.have.members(
+      [callerID]
+    );
+  });
+
+  test("visitPerformInlineStatement calls addLoopNode", function () {
+    const callerNodeName = "0000-MAIN-ROUTINE";
+    const callerStartLineNumber = 235;
+    const callerEndLineNumber = 256;
+
+    const stubPerformInlineStatementCtx = createStubParserRuleCtx(
+      sinon.createStubInstance(PerformInlineStatementContext),
+      "",
+      callerStartLineNumber,
+      callerEndLineNumber
+    ) as PerformInlineStatementContext;
+
+    const addLoopNodeStub = sinon.stub(visitor, "addLoopNode");
+    const loopNodeId = "400";
+    addLoopNodeStub.returns(loopNodeId);
+
+    visitor.visitPerformInlineStatement(stubPerformInlineStatementCtx);
+
+    expect(addLoopNodeStub).to.have.been.calledOnce;
+    expect(addLoopNodeStub).to.have.been.calledWith(
+      stubPerformInlineStatementCtx
+    );
+  });
+
   test("visitPerformInlineStatement call visitChildren once at the end", function () {
     const visitChildrenStub = sinon.stub(visitor, "visitChildren");
 
@@ -469,8 +677,6 @@ suite("Tests for Control Flow Visitor", () => {
       0,
       0
     ) as PerformInlineStatementContext;
-
-    initPerformInlineStatementCtx(stubPerformInlineStatementCtx, "");
 
     visitor.visitPerformInlineStatement(stubPerformInlineStatementCtx);
 
@@ -489,9 +695,7 @@ suite("Tests for Control Flow Visitor", () => {
   test("when visitChildren get EOF, throw error if the start node not found in the visitor nodes", function () {
     const eof = createEOF();
 
-    expect(() => visitor.visitChildren(eof)).to.throw(
-      "Missing start or end node"
-    );
+    expect(() => visitor.visitChildren(eof)).to.throw("Missing start node");
   });
 
   test("when visitChildren get EOF, callers and callees of the node are populated correctly", function () {

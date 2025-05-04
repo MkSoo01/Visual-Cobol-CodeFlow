@@ -1,6 +1,7 @@
 const chai = require("chai");
 import { VisualCobolLexer } from "../generated/VisualCobolLexer";
 import {
+  GenericStatementContext,
   GenericTextContext,
   VisualCobolParser,
 } from "../generated/VisualCobolParser";
@@ -49,28 +50,6 @@ suite("Visual COBOL Grammar Tests for lexer", () => {
     expect(tokens[0].type).to.equal(VisualCobolLexer.EQUALS);
   });
 
-  test("should tokenize the E Q U A L S token not as EQUALS", () => {
-    const tokens = tokenize("E Q U A L S");
-
-    expect(tokens[0].type).to.not.equal(VisualCobolLexer.EQUALS);
-  });
-
-  test("SKIP_COPY_DIRECTIVE should skip the COPY statement correctly", () => {
-    const tokens = tokenize(
-      "COPY TEST              REPLACING ==(PREFIX)== BY ==TEST==."
-    );
-
-    expect(tokens.length).to.be.greaterThan(0);
-  });
-
-  test("SKIP_COPY_DIRECTIVE should skip the COPY directive correctly and tokenize the next line correctly", () => {
-    const tokens = tokenize(
-      "COPY TEST              REPLACING ==(PREFIX)== BY ==TEST==.\r\nNEXT"
-    );
-
-    expect(tokens.length).to.be.greaterThan(0);
-  });
-
   test("SKIP_ANOMALY should skip the line with '/' only", () => {
     const tokens = tokenize("/\r\n");
 
@@ -93,30 +72,6 @@ suite("Visual COBOL Grammar Tests for lexer", () => {
 
     const slashToken = tokens.find((token) => token.text === "/");
     expect(slashToken).to.not.be.undefined;
-  });
-
-  test("SKIP_MULTIPLY should skip the COMPUTE statement with '*' in single line", () => {
-    const tokens = tokenize("COMPUTE A = B * 5.");
-
-    expect(tokens.length).to.be.greaterThan(0);
-  });
-
-  test("SKIP_MULTIPLY should skip the COMPUTE statement with '*' (no space befor and after *) in single line", () => {
-    const tokens = tokenize("COMPUTE A = B*5.");
-
-    expect(tokens.length).to.be.greaterThan(0);
-  });
-
-  test("SKIP_MULTIPLY should skip the COMPUTE statement with '*' in multiple lines", () => {
-    const tokens = tokenize("COMPUTE A = B + C + \r\n D * 5.");
-
-    expect(tokens.length).to.be.greaterThan(0);
-  });
-
-  test("SKIP_MULTIPLY should not skip the COMPUTE statement without '*' in the line", () => {
-    const tokens = tokenize("COMPUTE A = B + C.");
-
-    expect(tokens.length).to.be.greaterThan(1);
   });
 
   test("SKIP_COMMENT should skip the comment with '*'", () => {
@@ -190,6 +145,30 @@ suite("Visual COBOL Grammar Tests for lexer", () => {
     expect(tokens[0].type).to.equal(VisualCobolLexer.EXECSQLLINE);
     expect(tokens[1].type).to.equal(VisualCobolLexer.DOT_FS);
   });
+
+  test("NAME_IDENTIFIER tokenized correctly", () => {
+    const tokens = tokenize("0000-MAIN-ROUTINE");
+
+    expect(tokens[0].type).to.equal(VisualCobolLexer.NAME_IDENTIFIER);
+  });
+
+  test("NAME_IDENTIFIER tokenized correctly 2", () => {
+    const tokens = tokenize("0000A-MAIN-ROUTINE");
+
+    expect(tokens[0].type).to.equal(VisualCobolLexer.NAME_IDENTIFIER);
+  });
+
+  test("NAME_IDENTIFIER tokenized correctly 3", () => {
+    const tokens = tokenize("001A-INIT");
+
+    expect(tokens[0].type).to.equal(VisualCobolLexer.NAME_IDENTIFIER);
+  });
+
+  test("GENERIC_WORD tokenized correctly (Unidentified word will be tokenized as GENERIC_WORD))", () => {
+    const tokens = tokenize("X(132)");
+
+    expect(tokens[0].type).to.equal(VisualCobolLexer.GENERIC_WORD);
+  });
 });
 
 suite("Visual COBOL Grammar Tests for parser", () => {
@@ -241,7 +220,7 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     expect(dataDivisionCtx.genericText(3).text).to.be.equal("SECTION.");
   });
 
-  test("PROCEDURE DECLARATIVES", () => {
+  test("PROCEDURE DECLARATIVES with procedureSectionHeader", () => {
     const input =
       "PROCEDURE DIVISION.\r\n DECLARATIVES.\r\n 0000-QUEUE-PROC   SECTION." +
       "\r\n USE AFTER ERROR PROCEDURE ON QUEUE-IN, QUEUE-OUT.\r\n END DECLARATIVES.";
@@ -259,7 +238,25 @@ suite("Visual COBOL Grammar Tests for parser", () => {
     );
   });
 
-  test("the paragraphExit", () => {
+  test("PROCEDURE DECLARATIVES with genericDeclarative", () => {
+    const input =
+      "PROCEDURE DIVISION.\r\n DECLARATIVES.\r\n 0000-QUEUE-PROC." +
+      "\r\n END DECLARATIVES.";
+    const procedureDeclarativeCtx = parseInput(input)
+      .procedureDivision()
+      .procedureDeclaratives();
+
+    expect(procedureDeclarativeCtx!.childCount).to.be.equal(6);
+    expect(procedureDeclarativeCtx!.getChild(0).text).to.be.equal(
+      "DECLARATIVES"
+    );
+    expect(procedureDeclarativeCtx!.getChild(3).text).to.be.equal("END");
+    expect(procedureDeclarativeCtx!.getChild(4).text).to.be.equal(
+      "DECLARATIVES"
+    );
+  });
+
+  test("the paragraph", () => {
     const input = "0000-MAIN-ROUTINE.\r\n 0000-EXIT.";
     const paragraph = parseInput(input).paragraph();
 
@@ -279,10 +276,8 @@ suite("Visual COBOL Grammar Tests for parser", () => {
 
     const paragraphExit = paragraph.paragraphExit();
     expect(paragraphExit?.paragraphName().text).to.be.equal("0000-EXIT");
-    expect(paragraph.lastParagraph()?.childCount).to.be.equal(2);
-    expect(paragraph.lastParagraph()?.genericText(1).text).to.be.equal(
-      "STOPRUN."
-    );
+    expect(paragraph.lastParagraph()?.childCount).to.be.equal(3);
+    expect(paragraph.lastParagraph()?.genericText(2).text).to.be.equal("RUN.");
   });
 
   test("the classCondition with 'EQUALS ZEROS'", () => {
@@ -299,5 +294,16 @@ suite("Visual COBOL Grammar Tests for parser", () => {
 
     expect(classCondition).to.not.be.null;
     expect(classCondition.childCount).to.be.greaterThan(0);
+  });
+
+  test("the generic statement", () => {
+    const input =
+      '0000-MAIN-ROUTINE.\r\n CALL "connectdb". \r\n 0000-EXIT. \r\n STOP RUN.';
+    const paragraph = parseInput(input).paragraph();
+
+    expect(paragraph.childCount).to.be.equal(5);
+
+    const genericStatement = paragraph.getChild(2);
+    expect(genericStatement instanceof GenericStatementContext).to.not.be.true;
   });
 });

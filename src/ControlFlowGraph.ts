@@ -19,32 +19,19 @@ export interface Node {
   endLineNumber: number;
   callers: string[];
   callees: string[];
-  x?: number;
-  y?: number;
-  flow: string;
 }
 
 export interface Edge {
   id: string;
   source: string;
   target: string;
-  isPolyline: boolean;
-  flow: string;
-  isAngled?: boolean;
-  isLoop?: boolean;
-  points?: number[];
-}
-
-export interface Route {
-  id: string;
-  nodes: string[];
+  isLoopBackEdge: boolean;
 }
 
 export class ControlFlowGraph {
   private rawNodes: Node[] = [];
   private displayNodes: Node[] = [];
   private edges: Edge[] = [];
-  private routes: Route[] = [];
   private dupCallerList: string[] = [];
 
   public getDisplayNodes(): Node[] {
@@ -102,30 +89,21 @@ export class ControlFlowGraph {
     }
   }
 
-  public formEdge(source: string, target: string, isPolyline: boolean): Edge {
+  public formEdge(
+    source: string,
+    target: string,
+    isLoopBackEdge: boolean
+  ): Edge {
     return {
       id: source + "-" + target,
       source: source,
       target: target,
-      isPolyline: isPolyline,
-      flow: "f1",
+      isLoopBackEdge: isLoopBackEdge,
     };
   }
 
   public getEdges(): Edge[] {
     return [...this.edges];
-  }
-
-  private getRoute(): Route {
-    if (this.routes.length === 0) {
-      const route: Route = {
-        id: "route1",
-        nodes: [],
-      };
-      this.routes.push(route);
-    }
-
-    return this.routes[this.routes.length - 1];
   }
 
   public addEdge(edge: Edge) {
@@ -136,13 +114,12 @@ export class ControlFlowGraph {
         this.displayNodes.find((n) => n.id === edge.target) !== undefined;
       if (isValidSourceNode && isValidTargetNode) {
         this.edges.push(edge);
-        this.getRoute().nodes.push(edge.id);
       }
     }
   }
 
   public generateGraph(fileContent: string): string {
-    //const fileContent = fs.readFileSync(filePath, "utf-8");
+    // const fileContent = fs.readFileSync(filePath, "utf-8");
     // const fileContent = fs.readFileSync(
     //   "C:/Users/khims/source/repos/visual-cobol-codeflow/out/test/backtesting-summary.cbl",
     //   "utf-8"
@@ -257,6 +234,7 @@ export class ControlFlowGraph {
         const isCallingItself = calleeNode.callers[0].startsWith(
           calleeNode.id.split("_")[0] + "_"
         );
+        callerNode = calleeNode;
         if (calleeNode.callees.length > 0 && !isCallingItself) {
           if (callerNodeIsDup || hasMultipleCaller) {
             const isInfiniteLoop = this.getDupCallerList().includes(
@@ -282,8 +260,6 @@ export class ControlFlowGraph {
               false
             );
           }
-        } else {
-          callerNode = calleeNode;
         }
       } else {
         throw new Error(`Callee ${callee} not found`);
@@ -351,42 +327,60 @@ export class ControlFlowGraph {
     }
   }
 
+  private findLastCalleeNodeId(callerId: string): string {
+    let calleeNodeList: string[] = [callerId];
+    let lastCallee = callerId;
+    while (calleeNodeList.length > 0) {
+      const caller = this.getRawNodes().find(
+        (n) => n.id === this.getRawId(calleeNodeList[calleeNodeList.length - 1])
+      );
+
+      if (caller) {
+        calleeNodeList = caller.callees;
+        lastCallee = caller.id;
+      }
+    }
+
+    return lastCallee;
+  }
+
   public generateEdges() {
-    let latestLoopNodeId: string[] = [];
-    let lastLoopNodeCallee: string[] = [];
+    let loopExitMap: Map<string, string> = new Map<string, string>();
+
+    this.getDisplayNodes()
+      .filter((n) => n.type === NodeType.LOOP)
+      .forEach((n) => {
+        const loopNodeCallees = this.getRawNodes().find(
+          (r) => r.id === this.getRawId(n.id)
+        )!.callees;
+
+        let lastLoopNodeCalleeTmp = this.findLastCalleeNodeId(
+          loopNodeCallees[loopNodeCallees.length - 1]
+        );
+
+        if (
+          this.getDisplayNodes().find((d) => d.id === lastLoopNodeCalleeTmp) ===
+          undefined
+        ) {
+          lastLoopNodeCalleeTmp = this.getDupIdBasedOnCaller(
+            lastLoopNodeCalleeTmp,
+            n.id
+          );
+        }
+
+        loopExitMap.set(lastLoopNodeCalleeTmp, n.id);
+      });
 
     this.getDisplayNodes().forEach((n) => {
-      if (n.id === lastLoopNodeCallee[lastLoopNodeCallee.length - 1]) {
-        this.addEdge(this.formEdge(n.id, latestLoopNodeId.pop()!, true));
-        lastLoopNodeCallee.pop();
+      if (loopExitMap.has(n.id)) {
+        this.addEdge(this.formEdge(n.id, loopExitMap.get(n.id)!, true));
+        loopExitMap.delete(n.id);
       }
 
       if (n.callees.length > 0) {
         n.callees.forEach((c) => {
           this.addEdge(this.formEdge(n.id, c, false));
         });
-
-        if (n.type === NodeType.LOOP) {
-          latestLoopNodeId.push(n.id);
-          const loopNodeCallees = this.getRawNodes().find(
-            (r) => r.id === this.getRawId(n.id)
-          )!.callees;
-
-          let lastLoopNodeCalleeTmp =
-            loopNodeCallees[loopNodeCallees.length - 1];
-          if (
-            this.getDisplayNodes().find(
-              (d) => d.id === lastLoopNodeCalleeTmp
-            ) === undefined
-          ) {
-            lastLoopNodeCalleeTmp = this.getDupIdBasedOnCaller(
-              lastLoopNodeCalleeTmp,
-              n.id
-            );
-          }
-
-          lastLoopNodeCallee.push(lastLoopNodeCalleeTmp);
-        }
       }
     });
   }

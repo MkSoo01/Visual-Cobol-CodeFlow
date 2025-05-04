@@ -29,17 +29,15 @@ suite("Tests for Control Flow Graph", () => {
       endLineNumber: endLineNumber,
       callers: [],
       callees: [],
-      flow: "f1",
     };
   }
 
-  function formEdge(source: string, target: string, isPolyline: boolean) {
+  function formEdge(source: string, target: string, isLoopBackEdge: boolean) {
     return {
       id: source + "-" + target,
       source: source,
       target: target,
-      isPolyline: isPolyline,
-      flow: "f1",
+      isLoopBackEdge: isLoopBackEdge,
     };
   }
 
@@ -57,7 +55,9 @@ suite("Tests for Control Flow Graph", () => {
 
   // test("sample", function () {
   //   const cfgTest = new ControlFlowGraph();
-  //   cfgTest.generateGraph("C://Users//khims//Downloads//bpsr053.cbl");
+  //   cfgTest.generateGraph(
+  //     "C://Users//khims//Downloads//cbl-test//online//onrpt//bpsr005.cbl"
+  //   );
   // });
 
   test("the normal node with no caller will be removed", function () {
@@ -523,6 +523,41 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
+  test("infinite loop", function () {
+    const startNode = formNode(
+      "100",
+      "0000-MAIN-ROUTINE",
+      NodeType.START,
+      100,
+      200
+    );
+
+    const node2 = formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400);
+    const node3 = formNode("500", "2000-PROCESS", NodeType.NORMAL, 500, 600);
+    const node4 = formNode("700", "3000-PROCESS", NodeType.NORMAL, 700, 800);
+    const node5 = formNode("900", "4000-PROCESS", NodeType.NORMAL, 900, 1000);
+
+    // infinite loop: node2 -> node3 -> node5 -> node2
+    setCallerCallee(startNode, node2);
+    setCallerCallee(node2, node3);
+    setCallerCallee(node2, node4);
+    setCallerCallee(node3, node5);
+    setCallerCallee(node5, node2);
+
+    cfg.addRawNodes([startNode, node2, node3, node4, node5]);
+
+    cfg.generateDisplayNodes();
+
+    expect(cfg.getDisplayNodes().length).to.be.equal(6);
+    const node2_dup = cfg
+      .getDisplayNodes()
+      .find((node) => node.id === node2.id + "_2");
+    expect(node2_dup?.callees).to.be.deep.equal([node4.id + "_1"]);
+    expect(
+      cfg.getDisplayNodes()[cfg.getDisplayNodes().length - 1].id
+    ).to.be.equal(node4.id + "_1");
+  });
+
   test("the edges generated correctly for display nodes that has no condition node and loop node", function () {
     const startNode = formNode(
       "100",
@@ -610,7 +645,7 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  test("edges generated correctly for last loop node callee and loop node", function () {
+  test("edges generated correctly for the last loop node callee and loop node", function () {
     const startNode = formNode(
       "100",
       "0000-MAIN-ROUTINE",
@@ -673,47 +708,160 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  // TODO: test perform end node should point back to perform node
+  test("edges generated correctly for the last loop node callee and loop node 2", function () {
+    const startNode = formNode(
+      "100",
+      "0000-MAIN-ROUTINE",
+      NodeType.START,
+      100,
+      200
+    );
+    const loopNode = formNode("300", "1000-LOOP", NodeType.LOOP, 300, 400);
+    const calleeNode = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
 
-  // test("should contain all the edges correctly", function () {
-  //   expect(cfg.edges).to.not.be.empty;
+    const lastCalleeNodeInLoop = formNode(
+      "700",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      700,
+      800
+    );
 
-  //   const expectedEdges = [
-  //     "235-271",
-  //     "271-482",
-  //     "482-245",
-  //     "245-751",
-  //     "751-279",
-  //     "279-294",
-  //     "294-530",
-  //     "530-544_1",
-  //     "544_1-459_1",
-  //     "459_1-651_1",
-  //     "651_1-304",
-  //     "304-305",
-  //     "305-613",
-  //     "613-324",
-  //     "324-515",
-  //     "515-499_1",
-  //     "499_1-339",
-  //     "339-340",
-  //     "340-378",
-  //     "378-388",
-  //     "388-398",
-  //     "398-630",
-  //     "630-668",
-  //     "668-688",
-  //     "688-709",
-  //     "709-729",
-  //     "729-419",
-  //     "419-499_2",
-  //     "499_2-442",
-  //     "442-770",
-  //     "770-544_2",
-  //     "544_2-459_2",
-  //     "459_2-651_2",
-  //     "651_2-256",
-  //   ];
-  //   expect(cfg.edges.map((edge) => edge.id)).to.have.members(expectedEdges);
-  // });
+    const calleeNodeOfLastNodeInLoop = formNode(
+      "1001",
+      "5000-PROCESS",
+      NodeType.NORMAL,
+      1001,
+      1100
+    );
+
+    const afterLoopNode = formNode(
+      "900",
+      "4000-PROCESS",
+      NodeType.NORMAL,
+      900,
+      1000
+    );
+
+    setCallerCallee(startNode, loopNode);
+    setCallerCallee(loopNode, calleeNode);
+    setCallerCallee(loopNode, lastCalleeNodeInLoop);
+    setCallerCallee(lastCalleeNodeInLoop, calleeNodeOfLastNodeInLoop);
+    setCallerCallee(startNode, afterLoopNode);
+    cfg.addRawNodes([
+      startNode,
+      loopNode,
+      calleeNode,
+      lastCalleeNodeInLoop,
+      calleeNodeOfLastNodeInLoop,
+      afterLoopNode,
+    ]);
+
+    cfg.generateDisplayNodes();
+    cfg.generateEdges();
+
+    const expectedE1 = formEdge(startNode.id, loopNode.id, false);
+    const expectedE2 = formEdge(loopNode.id, calleeNode.id, false);
+    const expectedE3 = formEdge(calleeNode.id, lastCalleeNodeInLoop.id, false);
+    const expectedE4 = formEdge(
+      lastCalleeNodeInLoop.id,
+      calleeNodeOfLastNodeInLoop.id,
+      false
+    );
+    const expectedE5 = formEdge(
+      calleeNodeOfLastNodeInLoop.id,
+      loopNode.id,
+      true
+    );
+    const expectedE6 = formEdge(
+      calleeNodeOfLastNodeInLoop.id,
+      afterLoopNode.id,
+      false
+    );
+
+    expect(cfg.getEdges()).to.be.deep.equal([
+      expectedE1,
+      expectedE2,
+      expectedE3,
+      expectedE4,
+      expectedE5,
+      expectedE6,
+    ]);
+  });
+
+  test("edges generated correctly for the inner loop node and its callee in another loop node", function () {
+    const startNode = formNode(
+      "100",
+      "0000-MAIN-ROUTINE",
+      NodeType.START,
+      100,
+      200
+    );
+    const loopNode = formNode("300", "1000-LOOP", NodeType.LOOP, 300, 400);
+    const innerLoopNode = formNode("401", "2000-LOOP", NodeType.LOOP, 401, 450);
+    const calleeNode = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
+
+    const lastCalleeNode = formNode(
+      "700",
+      "3000-PROCESS",
+      NodeType.NORMAL,
+      700,
+      800
+    );
+
+    const afterLoopNode = formNode(
+      "900",
+      "4000-PROCESS",
+      NodeType.NORMAL,
+      900,
+      1000
+    );
+
+    setCallerCallee(startNode, loopNode);
+    setCallerCallee(loopNode, innerLoopNode);
+    setCallerCallee(loopNode, lastCalleeNode);
+    setCallerCallee(innerLoopNode, calleeNode);
+    setCallerCallee(startNode, afterLoopNode);
+    cfg.addRawNodes([
+      startNode,
+      loopNode,
+      innerLoopNode,
+      lastCalleeNode,
+      calleeNode,
+      afterLoopNode,
+    ]);
+
+    cfg.generateDisplayNodes();
+    cfg.generateEdges();
+
+    const expectedE1 = formEdge(startNode.id, loopNode.id, false);
+    const expectedE2 = formEdge(loopNode.id, innerLoopNode.id, false);
+    const expectedE3 = formEdge(innerLoopNode.id, calleeNode.id, false);
+    const expectedE4 = formEdge(calleeNode.id, innerLoopNode.id, true);
+    const expectedE5 = formEdge(calleeNode.id, lastCalleeNode.id, false);
+    const expectedE6 = formEdge(lastCalleeNode.id, loopNode.id, true);
+    const expectedE7 = formEdge(lastCalleeNode.id, afterLoopNode.id, false);
+
+    expect(cfg.getEdges()).to.be.deep.equal([
+      expectedE1,
+      expectedE2,
+      expectedE3,
+      expectedE4,
+      expectedE5,
+      expectedE6,
+      expectedE7,
+    ]);
+  });
 });

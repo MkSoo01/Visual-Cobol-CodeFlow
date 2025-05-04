@@ -1,9 +1,11 @@
 const chai = require("chai");
 const sinonChai = require("sinon-chai");
-import { start } from "repl";
-import { ControlFlowGraph, Node, NodeType } from "../ControlFlowGraph";
-import exp from "constants";
-
+import {
+  ControlFlowGraph,
+  Node,
+  NodeType,
+  DisplayNode,
+} from "../ControlFlowGraph";
 chai.use(sinonChai);
 const expect = chai.expect;
 
@@ -46,11 +48,9 @@ suite("Tests for Control Flow Graph", () => {
     callee.callers.push(caller.id);
   }
 
-  function setCallerCalleeAfterReset(caller: Node, callee: Node) {
-    caller.callees = [];
-    callee.callers = [];
-    caller.callees.push(callee.id);
-    callee.callers.push(caller.id);
+  function setPrevNext(prevNode: DisplayNode, nextNode: DisplayNode) {
+    prevNode.next.push(nextNode.id);
+    nextNode.prev.push(prevNode.id);
   }
 
   // test("sample", function () {
@@ -328,10 +328,13 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(startNode, normalNode);
     cfg.addRawNodes([startNode, normalNode]);
 
-    const expectedStartNode = structuredClone(startNode);
-    const expectedNormalNode = structuredClone(normalNode);
-    expectedStartNode.callees = [expectedNormalNode.id];
-    expectedNormalNode.callers = [expectedStartNode.id];
+    const expectedStartNode = cfg.convertToDisplayNode(startNode, "");
+    const expectedNormalNode = cfg.convertToDisplayNode(
+      normalNode,
+      expectedStartNode.id
+    );
+    expectedStartNode.next = [expectedNormalNode.id];
+    expectedNormalNode.prev = [expectedStartNode.id];
 
     cfg.generateDisplayNodes();
 
@@ -389,16 +392,25 @@ suite("Tests for Control Flow Graph", () => {
 
     cfg.generateDisplayNodes();
 
-    const expectedStartNode = structuredClone(startNode);
-    const expectedCallerNode = structuredClone(callerNode);
-    const expectedDisplayNode_1 = structuredClone(nodeWithMultipleCallers);
+    const expectedStartNode = cfg.convertToDisplayNode(startNode, "");
+    const expectedCallerNode = cfg.convertToDisplayNode(
+      callerNode,
+      startNode.id
+    );
+    const expectedDisplayNode_1 = cfg.convertToDisplayNode(
+      nodeWithMultipleCallers,
+      startNode.id
+    );
     expectedDisplayNode_1.id = nodeWithMultipleCallers.id + "_1";
-    const expectedDisplayNode_2 = structuredClone(nodeWithMultipleCallers);
+    const expectedDisplayNode_2 = cfg.convertToDisplayNode(
+      nodeWithMultipleCallers,
+      callerNode.id
+    );
     expectedDisplayNode_2.id = nodeWithMultipleCallers.id + "_2";
 
-    setCallerCalleeAfterReset(expectedStartNode, expectedDisplayNode_1);
-    setCallerCalleeAfterReset(expectedDisplayNode_1, expectedCallerNode);
-    setCallerCalleeAfterReset(expectedCallerNode, expectedDisplayNode_2);
+    setPrevNext(expectedStartNode, expectedDisplayNode_1);
+    setPrevNext(expectedDisplayNode_1, expectedCallerNode);
+    setPrevNext(expectedCallerNode, expectedDisplayNode_2);
 
     expect(cfg.getDisplayNodes()).to.be.deep.equal([
       expectedStartNode,
@@ -432,17 +444,27 @@ suite("Tests for Control Flow Graph", () => {
 
     cfg.generateDisplayNodes();
 
-    const expectedStartNode = structuredClone(startNode);
-    const expectedDisplayNode_1 = structuredClone(testNode);
+    const expectedStartNode = cfg.convertToDisplayNode(startNode, "");
+    const expectedDisplayNode_1 = cfg.convertToDisplayNode(
+      testNode,
+      startNode.id
+    );
     expectedDisplayNode_1.id = testNode.id + "_1";
-    const expectedDisplayNode_2 = structuredClone(testNode);
-    expectedDisplayNode_2.id = testNode.id + "_2";
-    const expectedCalleeNode = structuredClone(calleeNode);
+    const expectedDisplayNode_2_id = testNode.id + "_2";
+    const expectedDisplayNode_2 = cfg.convertToDisplayNode(
+      testNode,
+      expectedDisplayNode_1.id
+    );
+    expectedDisplayNode_2.id = expectedDisplayNode_2_id;
+    const expectedCalleeNode = cfg.convertToDisplayNode(
+      calleeNode,
+      expectedDisplayNode_1.id
+    );
     expectedCalleeNode.id = calleeNode.id + "_1";
 
-    setCallerCalleeAfterReset(expectedStartNode, expectedDisplayNode_1);
-    setCallerCalleeAfterReset(expectedDisplayNode_1, expectedDisplayNode_2);
-    setCallerCalleeAfterReset(expectedDisplayNode_2, expectedCalleeNode);
+    setPrevNext(expectedStartNode, expectedDisplayNode_1);
+    setPrevNext(expectedDisplayNode_1, expectedDisplayNode_2);
+    setPrevNext(expectedDisplayNode_2, expectedCalleeNode);
 
     expect(cfg.getDisplayNodes()).to.be.deep.equal([
       expectedStartNode,
@@ -496,22 +518,37 @@ suite("Tests for Control Flow Graph", () => {
 
     cfg.generateDisplayNodes();
 
-    const expectedStartNode = structuredClone(startNode);
-    const expectedCallerNode = structuredClone(callerNode);
-    const expectedDisplayNode_1 = structuredClone(nodeWithMultipleCallers);
+    const expectedStartNode = cfg.convertToDisplayNode(startNode, "");
+    const expectedCallerNode = cfg.convertToDisplayNode(
+      callerNode,
+      startNode.id
+    );
+    const expectedDisplayNode_1 = cfg.convertToDisplayNode(
+      nodeWithMultipleCallers,
+      startNode.id
+    );
     expectedDisplayNode_1.id = nodeWithMultipleCallers.id + "_1";
-    const expectedDisplayNode_2 = structuredClone(nodeWithMultipleCallers);
+    const expectedDisplayNode_2 = cfg.convertToDisplayNode(
+      nodeWithMultipleCallers,
+      callerNode.id
+    );
     expectedDisplayNode_2.id = nodeWithMultipleCallers.id + "_2";
-    const expectedCalleeNode_1 = structuredClone(calleeNode);
+    const expectedCalleeNode_1 = cfg.convertToDisplayNode(
+      calleeNode,
+      expectedDisplayNode_1.id
+    );
     expectedCalleeNode_1.id = calleeNode.id + "_1";
-    const expectedCalleeNode_2 = structuredClone(calleeNode);
+    const expectedCalleeNode_2 = cfg.convertToDisplayNode(
+      calleeNode,
+      expectedDisplayNode_2.id
+    );
     expectedCalleeNode_2.id = calleeNode.id + "_2";
 
-    setCallerCalleeAfterReset(expectedStartNode, expectedDisplayNode_1);
-    setCallerCalleeAfterReset(expectedDisplayNode_1, expectedCalleeNode_1);
-    setCallerCalleeAfterReset(expectedCalleeNode_1, expectedCallerNode);
-    setCallerCalleeAfterReset(expectedCallerNode, expectedDisplayNode_2);
-    setCallerCalleeAfterReset(expectedDisplayNode_2, expectedCalleeNode_2);
+    setPrevNext(expectedStartNode, expectedDisplayNode_1);
+    setPrevNext(expectedDisplayNode_1, expectedCalleeNode_1);
+    setPrevNext(expectedCalleeNode_1, expectedCallerNode);
+    setPrevNext(expectedCallerNode, expectedDisplayNode_2);
+    setPrevNext(expectedDisplayNode_2, expectedCalleeNode_2);
 
     expect(cfg.getDisplayNodes()).to.be.deep.equal([
       expectedStartNode,
@@ -552,7 +589,7 @@ suite("Tests for Control Flow Graph", () => {
     const node2_dup = cfg
       .getDisplayNodes()
       .find((node) => node.id === node2.id + "_2");
-    expect(node2_dup?.callees).to.be.deep.equal([node4.id + "_1"]);
+    expect(node2_dup?.next).to.be.deep.equal([node4.id + "_1"]);
     expect(
       cfg.getDisplayNodes()[cfg.getDisplayNodes().length - 1].id
     ).to.be.equal(node4.id + "_1");
@@ -645,7 +682,7 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  test("edges generated correctly for the last loop node callee and loop node", function () {
+  test("the loop back edge generated correctly", function () {
     const startNode = formNode(
       "100",
       "0000-MAIN-ROUTINE",
@@ -708,7 +745,7 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  test("edges generated correctly for the last loop node callee and loop node 2", function () {
+  test("the loop back edge generated correctly 2", function () {
     const startNode = formNode(
       "100",
       "0000-MAIN-ROUTINE",
@@ -795,7 +832,91 @@ suite("Tests for Control Flow Graph", () => {
     ]);
   });
 
-  test("edges generated correctly for the inner loop node and its callee in another loop node", function () {
+  test("the loop back edge generated correctly for duplicate nodes", function () {
+    const startNode = formNode(
+      "100",
+      "0000-MAIN-ROUTINE",
+      NodeType.START,
+      100,
+      200
+    );
+    const dupNode = formNode("201", "1001-PROCESS", NodeType.NORMAL, 201, 250);
+    const calleeOfDupNode = formNode(
+      "1001",
+      "5000-PROCESS",
+      NodeType.NORMAL,
+      1001,
+      1100
+    );
+    const loopNode = formNode("300", "1000-LOOP", NodeType.LOOP, 300, 400);
+    const calleeNode = formNode(
+      "500",
+      "2000-PROCESS",
+      NodeType.NORMAL,
+      500,
+      600
+    );
+
+    const afterLoopNode = formNode(
+      "900",
+      "4000-PROCESS",
+      NodeType.NORMAL,
+      900,
+      1000
+    );
+
+    setCallerCallee(startNode, dupNode);
+    setCallerCallee(dupNode, calleeOfDupNode);
+    setCallerCallee(startNode, loopNode);
+    setCallerCallee(loopNode, calleeNode);
+    setCallerCallee(loopNode, dupNode);
+    setCallerCallee(startNode, afterLoopNode);
+    cfg.addRawNodes([
+      startNode,
+      dupNode,
+      calleeOfDupNode,
+      loopNode,
+      calleeNode,
+      afterLoopNode,
+    ]);
+
+    cfg.generateDisplayNodes();
+    cfg.generateEdges();
+
+    const expectedE1 = formEdge(startNode.id, dupNode.id + "_1", false);
+    const expectedE2 = formEdge(
+      dupNode.id + "_1",
+      calleeOfDupNode.id + "_1",
+      false
+    );
+    const expectedE3 = formEdge(calleeOfDupNode.id + "_1", loopNode.id, false);
+    const expectedE4 = formEdge(loopNode.id, calleeNode.id, false);
+    const expectedE5 = formEdge(calleeNode.id, dupNode.id + "_2", false);
+    const expectedE6 = formEdge(
+      dupNode.id + "_2",
+      calleeOfDupNode.id + "_2",
+      false
+    );
+    const expectedE7 = formEdge(calleeOfDupNode.id + "_2", loopNode.id, true);
+    const expectedE8 = formEdge(
+      calleeOfDupNode.id + "_2",
+      afterLoopNode.id,
+      false
+    );
+
+    expect(cfg.getEdges()).to.be.deep.equal([
+      expectedE1,
+      expectedE2,
+      expectedE3,
+      expectedE4,
+      expectedE5,
+      expectedE6,
+      expectedE7,
+      expectedE8,
+    ]);
+  });
+
+  test("the loop back edge generated correctly for the inner loop node", function () {
     const startNode = formNode(
       "100",
       "0000-MAIN-ROUTINE",

@@ -21,6 +21,17 @@ export interface Node {
   callees: string[];
 }
 
+export interface DisplayNode {
+  id: string;
+  label: string;
+  type: NodeType;
+  startLineNumber: number;
+  endLineNumber: number;
+  prev: string[];
+  next: string[];
+  caller: string;
+}
+
 export interface Edge {
   id: string;
   source: string;
@@ -30,18 +41,33 @@ export interface Edge {
 
 export class ControlFlowGraph {
   private rawNodes: Node[] = [];
-  private displayNodes: Node[] = [];
+  private displayNodes: DisplayNode[] = [];
   private edges: Edge[] = [];
   private dupCallerList: string[] = [];
 
-  public getDisplayNodes(): Node[] {
+  public getDisplayNodes(): DisplayNode[] {
     return [...this.displayNodes];
   }
 
-  private addDisplayNode(node: Node) {
-    if (node) {
-      this.displayNodes.push(node);
+  private addDisplayNode(displayNode: DisplayNode) {
+    if (displayNode) {
+      this.displayNodes.push(displayNode);
     }
+  }
+
+  public convertToDisplayNode(node: Node, caller: string): DisplayNode {
+    const clonedNode = structuredClone(node);
+    const displayNode: DisplayNode = {
+      id: clonedNode.id,
+      label: clonedNode.label,
+      type: clonedNode.type,
+      startLineNumber: clonedNode.startLineNumber,
+      endLineNumber: clonedNode.endLineNumber,
+      prev: [],
+      next: [],
+      caller: caller,
+    };
+    return displayNode;
   }
 
   public getRawNodes(): Node[] {
@@ -215,27 +241,33 @@ export class ControlFlowGraph {
   }
 
   private createDisplayNodesForCallees(
-    callerNode: Node,
+    callerNode: DisplayNode,
     callees: String[],
     callerNodeIsDup: boolean
-  ): Node {
+  ): DisplayNode {
+    let prevNode = callerNode;
+
     callees.forEach((callee) => {
-      let calleeNode = this.getRawNodes().find((node) => node.id === callee);
-      if (calleeNode) {
-        calleeNode = structuredClone(calleeNode);
-        const hasMultipleCaller = calleeNode.callers.length > 1;
+      let rawCalleeNode = this.getRawNodes().find((node) => node.id === callee);
+      if (rawCalleeNode) {
+        const calleeNode = this.convertToDisplayNode(
+          rawCalleeNode,
+          callerNode.id
+        );
+        const hasMultipleCaller = rawCalleeNode.callers.length > 1;
         if (callerNodeIsDup || hasMultipleCaller) {
           calleeNode.id = this.createDupNodesId(calleeNode);
         }
-        calleeNode.callers = [callerNode.id];
-        callerNode.callees = [calleeNode.id];
+        calleeNode.prev = [prevNode.id];
+        prevNode.next = [calleeNode.id];
         this.addDisplayNode(calleeNode);
 
-        const isCallingItself = calleeNode.callers[0].startsWith(
-          calleeNode.id.split("_")[0] + "_"
+        const isCallingItself = calleeNode.prev[0].startsWith(
+          rawCalleeNode.id + "_"
         );
-        callerNode = calleeNode;
-        if (calleeNode.callees.length > 0 && !isCallingItself) {
+
+        prevNode = calleeNode;
+        if (rawCalleeNode.callees.length > 0 && !isCallingItself) {
           if (callerNodeIsDup || hasMultipleCaller) {
             const isInfiniteLoop = this.getDupCallerList().includes(
               calleeNode.id.split("_")[0]
@@ -244,9 +276,9 @@ export class ControlFlowGraph {
             if (!isInfiniteLoop) {
               // console.log("insertDupCaller: " + calleeNode.id.split("_")[0]);
               this.insertDupCaller(calleeNode.id.split("_")[0]);
-              callerNode = this.createDisplayNodesForCallees(
+              prevNode = this.createDisplayNodesForCallees(
                 calleeNode,
-                [...calleeNode.callees],
+                [...rawCalleeNode.callees],
                 true
               );
 
@@ -254,9 +286,9 @@ export class ControlFlowGraph {
               this.popDupCallerList();
             }
           } else {
-            callerNode = this.createDisplayNodesForCallees(
+            prevNode = this.createDisplayNodesForCallees(
               calleeNode,
-              [...calleeNode.callees],
+              [...rawCalleeNode.callees],
               false
             );
           }
@@ -266,10 +298,10 @@ export class ControlFlowGraph {
       }
     });
 
-    return callerNode;
+    return prevNode;
   }
 
-  private createDupNodesId(currentNode: Node): string {
+  private createDupNodesId(currentNode: DisplayNode): string {
     const dupNodeId =
       currentNode.id +
       "_" +
@@ -294,21 +326,6 @@ export class ControlFlowGraph {
     return nodeId.split("_").length > 1;
   }
 
-  private getDupIdBasedOnCaller(nodeId: string, callerId: string): string {
-    if (this.checkIsDup(callerId)) {
-      const dupIndex = callerId.split("_")[1];
-      return nodeId + "_" + dupIndex;
-    }
-
-    const rawNode = this.getRawNodes().find((n) => n.id === nodeId);
-    if (rawNode && rawNode.callers.length > 1) {
-      const dupIndex = rawNode.callers.indexOf(callerId) + 1;
-      return nodeId + "_" + dupIndex;
-    }
-
-    return "";
-  }
-
   public generateDisplayNodes() {
     this.processRawNodesForDisplay(this.getRawNodes());
     const startNode = this.getRawNodes()[0];
@@ -316,28 +333,30 @@ export class ControlFlowGraph {
       throw new Error("Missing start node");
     }
 
-    const startNodeForDisplay = structuredClone(startNode);
-    this.displayNodes.push(startNodeForDisplay);
-    if (startNodeForDisplay.callees.length > 0) {
+    const startNodeForDisplay = this.convertToDisplayNode(startNode, "");
+    this.addDisplayNode(startNodeForDisplay);
+    if (startNode.callees.length > 0) {
       this.createDisplayNodesForCallees(
         startNodeForDisplay,
-        [...startNodeForDisplay.callees],
+        [...startNode.callees],
         false
       );
     }
   }
 
-  private findLastCalleeNodeId(callerId: string): string {
-    let calleeNodeList: string[] = [callerId];
-    let lastCallee = callerId;
-    while (calleeNodeList.length > 0) {
-      const caller = this.getRawNodes().find(
-        (n) => n.id === this.getRawId(calleeNodeList[calleeNodeList.length - 1])
+  private findLastCalleeNodeIdForLoop(loopNode: string): string {
+    let currentEndLoopNode = loopNode;
+
+    let lastCallee: string = "";
+    while (!lastCallee) {
+      const calleeList = this.getDisplayNodes().filter(
+        (n) => n.caller === currentEndLoopNode
       );
 
-      if (caller) {
-        calleeNodeList = caller.callees;
-        lastCallee = caller.id;
+      if (calleeList.length > 0) {
+        currentEndLoopNode = calleeList[calleeList.length - 1].id;
+      } else {
+        lastCallee = currentEndLoopNode;
       }
     }
 
@@ -350,25 +369,9 @@ export class ControlFlowGraph {
     this.getDisplayNodes()
       .filter((n) => n.type === NodeType.LOOP)
       .forEach((n) => {
-        const loopNodeCallees = this.getRawNodes().find(
-          (r) => r.id === this.getRawId(n.id)
-        )!.callees;
+        let lastLoopNodeCallee = this.findLastCalleeNodeIdForLoop(n.id);
 
-        let lastLoopNodeCalleeTmp = this.findLastCalleeNodeId(
-          loopNodeCallees[loopNodeCallees.length - 1]
-        );
-
-        if (
-          this.getDisplayNodes().find((d) => d.id === lastLoopNodeCalleeTmp) ===
-          undefined
-        ) {
-          lastLoopNodeCalleeTmp = this.getDupIdBasedOnCaller(
-            lastLoopNodeCalleeTmp,
-            n.id
-          );
-        }
-
-        loopExitMap.set(lastLoopNodeCalleeTmp, n.id);
+        loopExitMap.set(lastLoopNodeCallee, n.id);
       });
 
     this.getDisplayNodes().forEach((n) => {
@@ -377,15 +380,15 @@ export class ControlFlowGraph {
         loopExitMap.delete(n.id);
       }
 
-      if (n.callees.length > 0) {
-        n.callees.forEach((c) => {
+      if (n.next.length > 0) {
+        n.next.forEach((c) => {
           this.addEdge(this.formEdge(n.id, c, false));
         });
       }
     });
   }
 
-  public generateMermaidGraph(nodes: Node[], edges: Edge[]): string {
+  public generateMermaidGraph(nodes: DisplayNode[], edges: Edge[]): string {
     const nodeMap = new Map(
       nodes.map((n) => [n.id, n.label + " (" + n.startLineNumber + ")"])
     );

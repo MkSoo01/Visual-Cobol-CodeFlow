@@ -1,11 +1,18 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import * as fs from "fs";
+import * as crypto from "crypto";
 import { ControlFlowGraph } from "./ControlFlowGraph";
+import { CallHierarchyView } from "./CallHierarchyView";
 
 function getWebviewHtml(
-  mermaidGraph: string,
+  mermaidGraph: string[],
   themeKind: vscode.ColorThemeKind
 ): string {
+  const mermaidGraphText = mermaidGraph.join("\n");
+  const textSize: number = mermaidGraphText.length;
+  const maxEdges: number = mermaidGraph.length;
+  console.log("textSize" + textSize);
   let theme = "default";
   let bodyStyle = "";
 
@@ -38,7 +45,7 @@ function getWebviewHtml(
                                     display: flex;
                                     justify-content: center;
                                     align-items: center;">
-          ${mermaidGraph}
+          ${mermaidGraphText}
         </pre>
 
         <script>
@@ -49,7 +56,9 @@ function getWebviewHtml(
               tooltip: false,
               flowchart: { useMaxWidth: true, htmlLabels: false, curve: "basis" },
               securityLevel: "loose",
-              theme: "${theme}"
+              theme: "${theme}",
+              maxTextSize: ${textSize},
+              maxEdges: ${maxEdges}
             });
 
             window.focusOn = function(startLineNumber) {
@@ -64,13 +73,60 @@ function getWebviewHtml(
 `;
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export interface CfgData {
+  fileCheksum: string;
+  cfg: ControlFlowGraph;
+  webviewPanel?: vscode.WebviewPanel;
+}
+
+export async function initCfg(
+  editor: vscode.TextEditor,
+  cfgMap: Map<string, CfgData>
+): Promise<ControlFlowGraph> {
+  const filePath = editor.document.uri.fsPath;
+  const ext = path.extname(filePath);
+
+  if (ext === ".cbl") {
+    const fileChecksum = await getFileChecksum(filePath);
+
+    let currentCfgData = cfgMap.get(editor.document.fileName);
+    if (!currentCfgData) {
+      const newCfg = new ControlFlowGraph();
+      newCfg.initGraph(editor.document.getText());
+
+      const newCfgData: CfgData = {
+        fileCheksum: fileChecksum,
+        cfg: newCfg,
+      };
+      cfgMap.set(editor.document.fileName, newCfgData);
+      currentCfgData = newCfgData;
+    } else if (currentCfgData.fileCheksum !== fileChecksum) {
+      currentCfgData.fileCheksum = fileChecksum;
+      currentCfgData.cfg.initGraph(editor.document.getText());
+    }
+
+    return Promise.resolve(currentCfgData.cfg);
+  }
+
+  return Promise.resolve(new ControlFlowGraph());
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  const cfgMap = new Map<string, CfgData>();
+  const editor = vscode.window.activeTextEditor;
+
+  if (editor) {
+    initCfg(editor, cfgMap);
+  }
+
+  new CallHierarchyView(context, cfgMap);
+
   const disposable = vscode.commands.registerCommand(
     "visual-cobol-codeflow.generateGraphInMarkdown",
     async () => {
       vscode.window.showInformationMessage("Generating graph...");
-      const editor = vscode.window.activeTextEditor;
 
+      const editor = vscode.window.activeTextEditor;
       if (!editor) {
         vscode.window.showErrorMessage("No active editor found.");
         return;
@@ -83,16 +139,16 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       try {
-        const document = editor.document;
-        const content = document.getText();
-        const cfg = new ControlFlowGraph();
-        const newFileContent = cfg.generateGraphInMarkdown(content);
+        const cfg = await initCfg(editor, cfgMap);
+        const newFileContent = cfg.getMermaidGraphInMarkdown();
 
         const writeData = new TextEncoder().encode(newFileContent);
         const newFilePath = path.join(
           workspaceFolder,
-          path.basename(document.fileName, path.extname(document.fileName)) +
-            "_mermaidGraph.md"
+          path.basename(
+            editor.document.fileName,
+            path.extname(editor.document.fileName)
+          ) + "_mermaidGraph.md"
         );
         const fileUri = vscode.Uri.file(newFilePath);
         await vscode.workspace.fs.writeFile(fileUri, writeData);
@@ -102,9 +158,6 @@ export function activate(context: vscode.ExtensionContext) {
       } catch (error) {
         vscode.window.showErrorMessage("Failed to create file: " + error);
       }
-    },
-    {
-      scope: "editorContext",
     }
   );
 
@@ -113,9 +166,7 @@ export function activate(context: vscode.ExtensionContext) {
   const disposable2 = vscode.commands.registerCommand(
     "visual-cobol-codeflow.generateGraphForCodeFlowDisplay",
     async () => {
-      let editor = vscode.window.visibleTextEditors.find((editor) => {
-        return editor.document.uri.path.endsWith(".cbl");
-      });
+      const editor = vscode.window.activeTextEditor;
 
       if (!editor) {
         vscode.window.showErrorMessage("No active editor found.");
@@ -123,49 +174,69 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       try {
-        const document = editor.document;
-        const documentUri = document.uri;
-        const content = document.getText();
-        const cfg = new ControlFlowGraph();
-        const mermaidGraph = cfg.generateGraphForCodeFlowDisplay(content);
+        const cfg = await initCfg(editor, cfgMap);
+        const mermaidGraph = cfg.getMermaidGraphForCodeFlowDisplay();
         const htmlContent = getWebviewHtml(
           mermaidGraph,
           vscode.window.activeColorTheme.kind
         );
 
-        const panel = vscode.window.createWebviewPanel(
-          "Visual COBOL Code-Flow",
-          path.basename(document.fileName),
-          vscode.ViewColumn.Two,
-          {
-            enableScripts: true,
-            retainContextWhenHidden: false,
-          }
-        );
-        panel.webview.html = htmlContent;
+        const cfgData = cfgMap.get(editor.document.fileName);
+        if (!cfgData) {
+          return;
+        }
 
-        panel.webview.onDidReceiveMessage(
-          async (message) => {
-            if (message.command === "focusOn") {
-              const doc = await vscode.workspace.openTextDocument(documentUri);
-              const editor = await vscode.window.showTextDocument(doc, {
-                preserveFocus: false,
-                viewColumn: vscode.ViewColumn.One,
-              });
-
-              const highlightedLineNumber = message.lineNo;
-              const line = editor.document.lineAt(highlightedLineNumber - 1);
-              const range = line.range;
-
-              editor.selection = new vscode.Selection(range.start, range.end);
-              editor.revealRange(range, vscode.TextEditorRevealType.AtTop);
+        if (!cfgData.webviewPanel) {
+          const panel = vscode.window.createWebviewPanel(
+            "Visual COBOL Code-Flow",
+            path.basename(editor.document.fileName),
+            vscode.ViewColumn.Two,
+            {
+              enableFindWidget: true,
+              enableScripts: true,
+              retainContextWhenHidden: false,
             }
-          },
-          null,
-          context.subscriptions
-        );
+          );
+          panel.webview.html = htmlContent;
+
+          const documentUri = editor.document.uri;
+          panel.webview.onDidReceiveMessage(
+            async (message) => {
+              if (message.command === "focusOn") {
+                const doc = await vscode.workspace.openTextDocument(
+                  documentUri
+                );
+                const editor = await vscode.window.showTextDocument(doc, {
+                  preserveFocus: false,
+                  viewColumn: vscode.ViewColumn.One,
+                });
+
+                const highlightedLineNumber = message.lineNo;
+                const line = editor.document.lineAt(highlightedLineNumber - 1);
+                const range = line.range;
+
+                editor.selection = new vscode.Selection(range.start, range.end);
+                editor.revealRange(range, vscode.TextEditorRevealType.AtTop);
+              }
+            },
+            null,
+            context.subscriptions
+          );
+
+          panel.onDidDispose(
+            () => {
+              cfgData.webviewPanel = undefined;
+            },
+            null,
+            context.subscriptions
+          );
+
+          cfgData.webviewPanel = panel;
+        } else {
+          cfgData.webviewPanel.webview.html = htmlContent;
+        }
       } catch (error) {
-        vscode.window.showErrorMessage("Failed to create file: " + error);
+        vscode.window.showErrorMessage("Error: " + error);
       }
     }
   );
@@ -175,3 +246,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
+
+function getFileChecksum(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+
+    stream.on("error", reject);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}

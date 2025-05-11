@@ -55,9 +55,11 @@ suite("Tests for Control Flow Graph", () => {
 
   // test("sample", function () {
   //   const cfgTest = new ControlFlowGraph();
-  //   cfgTest.generateGraph(
-  //     "C://Users//khims//Downloads//cbl-test//online//onrpt//bpsr005.cbl"
+  //   const abc = cfgTest.generateGraphForCodeFlowDisplay(
+  //     "C://Users//khims//Downloads//cbl-test//online//onrpt//rpsr019.cbl"
   //   );
+
+  //   console.log(abc);
   // });
 
   test("the normal node with no caller will be removed", function () {
@@ -78,7 +80,7 @@ suite("Tests for Control Flow Graph", () => {
       500
     );
 
-    cfg.addRawNodes([startNode, normalNodeWithNoCaller]);
+    cfg.setRawNodes([startNode, normalNodeWithNoCaller]);
 
     cfg.generateDisplayNodes();
 
@@ -114,7 +116,7 @@ suite("Tests for Control Flow Graph", () => {
 
     setCallerCallee(normalNodeWithNoCaller, calleeNode);
 
-    cfg.addRawNodes([startNode, normalNodeWithNoCaller, calleeNode]);
+    cfg.setRawNodes([startNode, normalNodeWithNoCaller, calleeNode]);
 
     cfg.generateDisplayNodes();
 
@@ -157,7 +159,7 @@ suite("Tests for Control Flow Graph", () => {
 
     setCallerCallee(ancestorNode, calleeNode);
     setCallerCallee(calleeNode, calleeNodeDescendant);
-    cfg.addRawNodes([
+    cfg.setRawNodes([
       startNode,
       ancestorNode,
       calleeNode,
@@ -188,7 +190,7 @@ suite("Tests for Control Flow Graph", () => {
     );
 
     setCallerCallee(startNode, loopNode);
-    cfg.addRawNodes([startNode, loopNode]);
+    cfg.setRawNodes([startNode, loopNode]);
 
     cfg.generateDisplayNodes();
 
@@ -223,7 +225,7 @@ suite("Tests for Control Flow Graph", () => {
 
     setCallerCallee(startNode, loopNode);
     setCallerCallee(loopNode, nestedLoopNode);
-    cfg.addRawNodes([startNode, loopNode, nestedLoopNode]);
+    cfg.setRawNodes([startNode, loopNode, nestedLoopNode]);
 
     cfg.generateDisplayNodes();
 
@@ -268,7 +270,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(loopNode, nestedLoopNode);
     setCallerCallee(nestedLoopNode, normalNodeDescendant);
 
-    cfg.addRawNodes([
+    cfg.setRawNodes([
       startNode,
       loopNode,
       nestedLoopNode,
@@ -306,7 +308,7 @@ suite("Tests for Control Flow Graph", () => {
 
     const callee = formNode("501", "2000-PROCESS", NodeType.NORMAL, 501, 600);
 
-    cfg.addRawNodes([startNode, loopNodeWithNoCaller, callee]);
+    cfg.setRawNodes([startNode, loopNodeWithNoCaller, callee]);
     setCallerCallee(loopNodeWithNoCaller, callee);
 
     cfg.generateDisplayNodes();
@@ -326,7 +328,7 @@ suite("Tests for Control Flow Graph", () => {
     const normalNode = formNode("400", "1000-INIT", NodeType.NORMAL, 400, 500);
 
     setCallerCallee(startNode, normalNode);
-    cfg.addRawNodes([startNode, normalNode]);
+    cfg.setRawNodes([startNode, normalNode]);
 
     const expectedStartNode = cfg.convertToDisplayNode(startNode, "");
     const expectedNormalNode = cfg.convertToDisplayNode(
@@ -357,7 +359,7 @@ suite("Tests for Control Flow Graph", () => {
 
     setCallerCallee(startNode, normalNode);
     normalNode.callees.push(non_existing_callee);
-    cfg.addRawNodes([startNode, normalNode]);
+    cfg.setRawNodes([startNode, normalNode]);
 
     expect(() => cfg.generateDisplayNodes()).throws(
       "Callee " + non_existing_callee + " not found"
@@ -388,7 +390,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(startNode, callerNode);
     setCallerCallee(callerNode, nodeWithMultipleCallers);
 
-    cfg.addRawNodes([startNode, callerNode, nodeWithMultipleCallers]);
+    cfg.setRawNodes([startNode, callerNode, nodeWithMultipleCallers]);
 
     cfg.generateDisplayNodes();
 
@@ -440,7 +442,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(startNode, testNode);
     setCallerCallee(testNode, testNode);
     setCallerCallee(testNode, calleeNode);
-    cfg.addRawNodes([startNode, testNode, calleeNode]);
+    cfg.setRawNodes([startNode, testNode, calleeNode]);
 
     cfg.generateDisplayNodes();
 
@@ -509,7 +511,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(startNode, callerNode);
     setCallerCallee(callerNode, nodeWithMultipleCallers);
     setCallerCallee(nodeWithMultipleCallers, calleeNode);
-    cfg.addRawNodes([
+    cfg.setRawNodes([
       startNode,
       callerNode,
       nodeWithMultipleCallers,
@@ -581,7 +583,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(node3, node5);
     setCallerCallee(node5, node2);
 
-    cfg.addRawNodes([startNode, node2, node3, node4, node5]);
+    cfg.setRawNodes([startNode, node2, node3, node4, node5]);
 
     cfg.generateDisplayNodes();
 
@@ -614,7 +616,7 @@ suite("Tests for Control Flow Graph", () => {
 
     setCallerCallee(startNode, callerNode);
     setCallerCallee(callerNode, calleeNode);
-    cfg.addRawNodes([startNode, callerNode, calleeNode]);
+    cfg.setRawNodes([startNode, callerNode, calleeNode]);
 
     cfg.generateDisplayNodes();
     cfg.generateEdges();
@@ -653,7 +655,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(startNode, callerNode);
     setCallerCallee(callerNode, nodeWithMultipleCallers);
     setCallerCallee(nodeWithMultipleCallers, calleeNode);
-    cfg.addRawNodes([
+    cfg.setRawNodes([
       startNode,
       callerNode,
       nodeWithMultipleCallers,
@@ -719,7 +721,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(loopNode, calleeNode);
     setCallerCallee(loopNode, lastCalleeNode);
     setCallerCallee(startNode, afterLoopNode);
-    cfg.addRawNodes([
+    cfg.setRawNodes([
       startNode,
       loopNode,
       calleeNode,
@@ -791,7 +793,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(loopNode, lastCalleeNodeInLoop);
     setCallerCallee(lastCalleeNodeInLoop, calleeNodeOfLastNodeInLoop);
     setCallerCallee(startNode, afterLoopNode);
-    cfg.addRawNodes([
+    cfg.setRawNodes([
       startNode,
       loopNode,
       calleeNode,
@@ -871,7 +873,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(loopNode, calleeNode);
     setCallerCallee(loopNode, dupNode);
     setCallerCallee(startNode, afterLoopNode);
-    cfg.addRawNodes([
+    cfg.setRawNodes([
       startNode,
       dupNode,
       calleeOfDupNode,
@@ -955,7 +957,7 @@ suite("Tests for Control Flow Graph", () => {
     setCallerCallee(loopNode, lastCalleeNode);
     setCallerCallee(innerLoopNode, calleeNode);
     setCallerCallee(startNode, afterLoopNode);
-    cfg.addRawNodes([
+    cfg.setRawNodes([
       startNode,
       loopNode,
       innerLoopNode,
@@ -984,5 +986,121 @@ suite("Tests for Control Flow Graph", () => {
       expectedE6,
       expectedE7,
     ]);
+  });
+
+  test("mermaid graph generated for markdown correctly", function () {
+    const startNode = cfg.convertToDisplayNode(
+      formNode("100", "0000-MAIN-ROUTINE", NodeType.START, 100, 200),
+      ""
+    );
+    const normalNode = cfg.convertToDisplayNode(
+      formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400),
+      "100"
+    );
+    const normalNode2 = cfg.convertToDisplayNode(
+      formNode("500", "2000-PROCESS", NodeType.NORMAL, 500, 600),
+      "300"
+    );
+    const edge1 = formEdge(startNode.id, normalNode.id, false);
+    const edge2 = formEdge(normalNode.id, normalNode2.id, false);
+
+    const mermaidGraphLines = cfg
+      .generateMermaidGraphForMarkdown(
+        [startNode, normalNode, normalNode2],
+        [edge1, edge2]
+      )
+      .split("\n");
+
+    const actual = [
+      mermaidGraphLines[2].replaceAll("\t", ""),
+      mermaidGraphLines[3].replaceAll("\t", ""),
+    ];
+    const expected = [
+      `${edge1.source}["${startNode.label} (${startNode.startLineNumber})"] --> ${edge1.target}["${normalNode.label} (${normalNode.startLineNumber})"]`,
+      `${edge2.source}["${normalNode.label} (${normalNode.startLineNumber})"] --> ${edge2.target}["${normalNode2.label} (${normalNode2.startLineNumber})"]`,
+    ];
+
+    expect(mermaidGraphLines.length).to.be.equal(5);
+    expect(actual).to.be.deep.equal(expected);
+  });
+
+  test("mermaid graph generated correctly for view", function () {
+    const startNode = cfg.convertToDisplayNode(
+      formNode("100", "0000-MAIN-ROUTINE", NodeType.START, 100, 200),
+      ""
+    );
+    const normalNode = cfg.convertToDisplayNode(
+      formNode("300", "1000-INIT", NodeType.NORMAL, 300, 400),
+      "100"
+    );
+    const normalNode2 = cfg.convertToDisplayNode(
+      formNode("500", "2000-PROCESS", NodeType.NORMAL, 500, 600),
+      "300"
+    );
+    const edge1 = formEdge(startNode.id, normalNode.id, false);
+    const edge2 = formEdge(normalNode.id, normalNode2.id, false);
+
+    const mermaidGraphLines = cfg.generateMermaidGraphForView(
+      [startNode, normalNode, normalNode2],
+      [edge1, edge2]
+    );
+
+    const actual = [
+      mermaidGraphLines[1].replaceAll("\t", ""),
+      mermaidGraphLines[2].replaceAll("\t", ""),
+      mermaidGraphLines[3].replaceAll("\t", ""),
+      mermaidGraphLines[4].replaceAll("\t", ""),
+      mermaidGraphLines[5].replaceAll("\t", ""),
+    ];
+
+    const expected = [
+      `${edge1.source}["${startNode.label}"] --> ${edge1.target}["${normalNode.label}"]`,
+      `${edge2.source}["${normalNode.label}"] --> ${edge2.target}["${normalNode2.label}"]`,
+      `click ${startNode.id} call focusOn(${startNode.startLineNumber})`,
+      `click ${normalNode.id} call focusOn(${normalNode.startLineNumber})`,
+      `click ${normalNode2.id} call focusOn(${normalNode2.startLineNumber})`,
+    ];
+
+    expect(mermaidGraphLines.length).to.be.equal(6);
+    expect(actual).to.be.deep.equal(expected);
+  });
+
+  test("ellipsis for long node label in mermaid graph", function () {
+    const startNode = cfg.convertToDisplayNode(
+      formNode("100", "0000-MAIN-ROUTINE", NodeType.START, 100, 200),
+      ""
+    );
+    const nodeWithLongLabel = cfg.convertToDisplayNode(
+      formNode(
+        "150",
+        "PERFORM UNTIL ASDEF LSAPEDST DLSELKSS SEILS LEKSLES ISELV LSEILDL LOTJWO LSEILISEJN SLENEI LLSIEJEL LISEJ",
+        NodeType.LOOP,
+        150,
+        160
+      ),
+      "100"
+    );
+
+    const edge = formEdge(startNode.id, nodeWithLongLabel.id, false);
+    const mermaidGraphLines = cfg.generateMermaidGraphForView(
+      [startNode, nodeWithLongLabel],
+      [edge]
+    );
+
+    const actual = [
+      mermaidGraphLines[1].replaceAll("\t", ""),
+      mermaidGraphLines[2].replaceAll("\t", ""),
+      mermaidGraphLines[3].replaceAll("\t", ""),
+    ];
+
+    const labelWithEllipsis = nodeWithLongLabel.label.substring(0, 75) + "...";
+    const expected = [
+      `${edge.source}["${startNode.label}"] --> ${edge.target}["${labelWithEllipsis}"]`,
+      `click ${startNode.id} call focusOn(${startNode.startLineNumber})`,
+      `click ${nodeWithLongLabel.id} call focusOn(${nodeWithLongLabel.startLineNumber})`,
+    ];
+
+    expect(mermaidGraphLines.length).to.be.equal(4);
+    expect(actual).to.be.deep.equal(expected);
   });
 });

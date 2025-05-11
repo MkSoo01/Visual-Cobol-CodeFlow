@@ -17,6 +17,7 @@ export interface Node {
   type: NodeType;
   startLineNumber: number;
   endLineNumber: number;
+  invocationMap?: Map<string, number>;
   callers: string[];
   callees: string[];
 }
@@ -74,9 +75,9 @@ export class ControlFlowGraph {
     return [...this.rawNodes];
   }
 
-  public addRawNodes(nodes: Node[]) {
+  public setRawNodes(nodes: Node[]) {
     if (nodes.length > 0) {
-      this.rawNodes.push(...nodes);
+      this.rawNodes = nodes;
     }
   }
 
@@ -93,10 +94,8 @@ export class ControlFlowGraph {
     }
   }
 
-  private removeDisplayNodeByIndex(nodeIndexToRemove: number) {
-    if (nodeIndexToRemove !== -1) {
-      this.displayNodes.splice(nodeIndexToRemove, 1);
-    }
+  private resetDisplayNodes() {
+    this.displayNodes = [];
   }
 
   public getDupCallerList(): string[] {
@@ -144,7 +143,11 @@ export class ControlFlowGraph {
     }
   }
 
-  private initGraph(fileContent: string) {
+  public resetEdges() {
+    this.edges = [];
+  }
+
+  public initGraph(fileContent: string) {
     // const fileContent = fs.readFileSync(filePath, "utf-8");
     // const fileContent = fs.readFileSync(
     //   "C:/Users/khims/source/repos/visual-cobol-codeflow/out/test/backtesting-summary.cbl",
@@ -154,25 +157,32 @@ export class ControlFlowGraph {
     const lexer = new VisualCobolLexer(inputStream);
     const tokenStream = new CommonTokenStream(lexer);
     const parser = new VisualCobolParser(tokenStream);
-    //parser.errorHandler = new BailErrorStrategy();
+    parser.errorHandler = new BailErrorStrategy();
     const tree = parser.startRule();
 
     const visitor = new ControlFlowVisitor();
     visitor.visit(tree);
 
-    this.addRawNodes(visitor.getNodes());
+    this.setRawNodes(visitor.getNodes());
+    this.resetDisplayNodes();
+    this.resetEdges();
+
     this.generateDisplayNodes();
     this.generateEdges();
   }
 
-  public generateGraphInMarkdown(fileContent: string): string {
-    this.initGraph(fileContent);
-    return this.generateMermaidGraph(this.displayNodes, this.edges);
+  public getMermaidGraphInMarkdown(): string {
+    return this.generateMermaidGraphForMarkdown(
+      this.getDisplayNodes(),
+      this.getEdges()
+    );
   }
 
-  public generateGraphForCodeFlowDisplay(fileContent: string): string {
-    this.initGraph(fileContent);
-    return this.generateMermaidGraphForDisplay(this.displayNodes, this.edges);
+  public getMermaidGraphForCodeFlowDisplay(): string[] {
+    return this.generateMermaidGraphForView(
+      this.getDisplayNodes(),
+      this.getEdges()
+    );
   }
 
   private findCalleesOfRemovedNode(
@@ -323,18 +333,6 @@ export class ControlFlowGraph {
     return dupNodeId;
   }
 
-  private getRawId(nodeId: string): string {
-    if (this.checkIsDup(nodeId)) {
-      return nodeId.split("_")[0];
-    }
-
-    return nodeId;
-  }
-
-  private checkIsDup(nodeId: string): boolean {
-    return nodeId.split("_").length > 1;
-  }
-
   public generateDisplayNodes() {
     this.processRawNodesForDisplay(this.getRawNodes());
     const startNode = this.getRawNodes()[0];
@@ -397,60 +395,78 @@ export class ControlFlowGraph {
     });
   }
 
-  public generateMermaidGraph(nodes: DisplayNode[], edges: Edge[]): string {
+  private generateMermaidGraphContent(
+    nodes: DisplayNode[],
+    edges: Edge[],
+    displayLineNumber: boolean
+  ): string[] {
+    const content = [];
     const nodeMap = new Map(
       nodes.map((n) => {
-        // let caller = "";
-        // if (n.type !== NodeType.START) {
-        //   let callerNode = this.getDisplayNodes().find(
-        //     (r) => r.id === n.caller
-        //   );
-        //   while (callerNode?.type === NodeType.LOOP) {
-        //     callerNode = this.getDisplayNodes().find(
-        //       (r) => r.id === callerNode?.caller
-        //     );
-        //   }
-        //   caller = "[" + callerNode?.label.trim() + "] <br> ";
-        // }
+        let lineNumberLabel = "";
+        if (displayLineNumber) {
+          lineNumberLabel = " (" + n.startLineNumber + ")";
+        }
 
-        return [n.id, n.label + " (" + n.startLineNumber + ")"];
+        let label = n.label;
+        const labelLengthLimit = 75;
+        const ellipsis = "...";
+        if (label.length > labelLengthLimit + ellipsis.length) {
+          label = label.substring(0, labelLengthLimit) + "...";
+        }
+
+        return [n.id, label + lineNumberLabel];
       })
     );
-    const lines = ["```mermaid", "graph TD"];
+
     for (const edge of edges) {
       const sourceLabel = nodeMap.get(edge.source) ?? edge.source;
       const targetLabel = nodeMap.get(edge.target) ?? edge.target;
-      lines.push(
+      content.push(
         `\t${edge.source}["${sourceLabel}"] --> ${edge.target}["${targetLabel}"]`
       );
     }
-    lines.push("```");
-    return lines.join("\n");
+
+    return content;
   }
 
-  public generateMermaidGraphForDisplay(
+  public generateMermaidGraphForMarkdown(
     nodes: DisplayNode[],
     edges: Edge[]
   ): string {
+    const mermaidGraph = ["```mermaid", "graph TD"];
+    const mermaidGraphContent = this.generateMermaidGraphContent(
+      nodes,
+      edges,
+      true
+    );
+    mermaidGraph.push(...mermaidGraphContent);
+    mermaidGraph.push("```");
+    return mermaidGraph.join("\n");
+  }
+
+  public generateMermaidGraphForView(
+    nodes: DisplayNode[],
+    edges: Edge[]
+  ): string[] {
     const clickActionLines: string[] = [];
     const nodeMap = new Map(
       nodes.map((n) => {
         clickActionLines.push(
           `\t\tclick ${n.id} call focusOn(${n.startLineNumber})`
         );
-        return [n.id, n.label + " (" + n.startLineNumber + ")"];
+        return [n.id, n.label];
       })
     );
 
-    const lines = ["\n\tgraph TD"];
-    for (const edge of edges) {
-      const sourceLabel = nodeMap.get(edge.source) ?? edge.source;
-      const targetLabel = nodeMap.get(edge.target) ?? edge.target;
-      lines.push(
-        `\t\t${edge.source}["${sourceLabel}"] --> ${edge.target}["${targetLabel}"]`
-      );
-    }
-    lines.push(...clickActionLines);
-    return lines.join("\n");
+    const mermaidGraphForView = ["\n\tgraph TD"];
+    const mermaidGraphContent = this.generateMermaidGraphContent(
+      nodes,
+      edges,
+      false
+    );
+    mermaidGraphForView.push(...mermaidGraphContent);
+    mermaidGraphForView.push(...clickActionLines);
+    return mermaidGraphForView;
   }
 }

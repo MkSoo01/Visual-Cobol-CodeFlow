@@ -19,26 +19,45 @@
       {
         "command": "visual-cobol-codeflow.generateGraphForCodeFlowDisplay",
         "title": "codeflow: Show Control Flow View"
-      }
-    ]
-  },
-  "menus": {
-    "editor/context": [
-      {
-        "command": "visual-cobol-codeflow.generateGraphInMarkdown",
-        "when": "editorLangId == plaintext",
-        "group": "navigation"
       },
       {
-        "command": "visual-cobol-codeflow.generateGraphForCodeFlowDisplay",
-        "when": "editorLangId == plaintext",
-        "group": "navigation"
+        "command": "visual-cobol-codeflow.openCallHierarchy",
+        "title": "codeflow: Open Call Hierarchy"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "visual-cobol-codeflow.generateGraphInMarkdown",
+          "when": "editorLangId == plaintext",
+          "group": "navigation"
+        },
+        {
+          "command": "visual-cobol-codeflow.generateGraphForCodeFlowDisplay",
+          "when": "editorLangId == plaintext",
+          "group": "navigation"
+        },
+        {
+          "command": "visual-cobol-codeflow.openCallHierarchy",
+          "when": "editorLangId == plaintext",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "callHierarchyView",
+          "name": "Call Hierarchy View"
+        }
+      ]
+    }
   },
   "activationEvents": [
     "onCommand:visual-cobol-codeflow.generateGraphInMarkdown",
-    "onCommand:visual-cobol-codeflow.generateGraphForCodeFlowDisplay"
+    "onCommand:visual-cobol-codeflow.generateGraphForCodeFlowDisplay",
+    "onCommand:visual-cobol-codeflow.openCallHierarchy",
+    "onView:callHierarchyView"
   ],
   "scripts": {
     "vscode:prepublish": "npm run package",

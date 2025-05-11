@@ -107,9 +107,14 @@ suite("Tests for Control Flow Visitor", () => {
 
   function createStubPerformProcedureStatementCtx(
     procedureName: string,
-    caller: ParserRuleContext
+    caller: ParserRuleContext,
+    invocationLineNo?: number
   ): PerformProcedureStatementContext {
     const stubCtx = sinon.createStubInstance(PerformProcedureStatementContext);
+    const stubStartToken: Token = {
+      line: invocationLineNo ? invocationLineNo : 0,
+    } as Token;
+    defineProperty(stubCtx, "start", stubStartToken);
     const stubProcedureNameCtx = createStubParserRuleCtx(
       sinon.createStubInstance(ProcedureNameContext),
       procedureName,
@@ -437,10 +442,23 @@ suite("Tests for Control Flow Visitor", () => {
     ).to.have.members([procedureName]);
   });
 
+  test("no need to add the callee if it is same as the previous callee", function () {
+    const callerId = "100";
+    const calleeId = "200";
+    visitor.addEntryToCallerCalleesMap(callerId, calleeId);
+    visitor.addEntryToCallerCalleesMap(callerId, calleeId);
+
+    expect(
+      visitor.getCallerToCalleesMap().get(callerId),
+      "Caller to Callees Map"
+    ).to.have.members([calleeId]);
+  });
+
   test("visitPerformProcedureStatement calls addPerformNode if has performType", function () {
     const callerNodeName = "0000-MAIN-ROUTINE";
     const callerStartLineNumber = 235;
     const callerEndLineNumber = 256;
+    const callerId = callerStartLineNumber.toString();
     const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
       callerNodeName,
       callerStartLineNumber,
@@ -473,12 +491,17 @@ suite("Tests for Control Flow Visitor", () => {
     expect(addLoopNodeStub).to.have.been.calledWith(stubCtx);
   });
 
-  test("visitPerformProcedureStatement call visitChildren once at the end", function () {
+  test("visitPerformProcedureStatement call addEntryToInvocationMap and visitChildren at the end", function () {
+    const addEntryToInvocationMapStub = sinon.stub(
+      visitor,
+      "addEntryToInvocationMap"
+    );
     const visitChildrenStub = sinon.stub(visitor, "visitChildren");
 
     const callerNodeName = "0000-MAIN-ROUTINE";
     const callerStartLineNumber = 235;
     const callerEndLineNumber = 256;
+    const callerId = callerStartLineNumber.toString();
     const stubParagraphCtx: ParagraphContext = createStubParagraphCtx(
       callerNodeName,
       callerStartLineNumber,
@@ -486,14 +509,119 @@ suite("Tests for Control Flow Visitor", () => {
     ) as unknown as ParagraphContext;
 
     const procedureName = "1000-INIT";
+    const invocationLineNumber = 240;
     const stubCtx = createStubPerformProcedureStatementCtx(
       procedureName,
-      stubParagraphCtx
+      stubParagraphCtx,
+      invocationLineNumber
     );
 
     visitor.visitPerformProcedureStatement(stubCtx);
 
-    expect(visitChildrenStub).to.have.been.calledOnce;
+    expect(addEntryToInvocationMapStub).to.have.been.calledWith(
+      procedureName,
+      callerId,
+      invocationLineNumber
+    );
+    expect(visitChildrenStub, "visitChildren").to.have.been.calledOnce;
+  });
+
+  test("addEntryToInvocationMap add entry to invocationMap", function () {
+    const callerNodeName = "0000-MAIN-ROUTINE";
+    const callerStartLineNumber = 235;
+    const callerEndLineNumber = 256;
+    const callerId = callerStartLineNumber.toString();
+    const calleeLabel = "1000-INIT";
+    const invocationLineNumber = 240;
+
+    visitor.addNode(
+      formNode(
+        callerId,
+        callerNodeName,
+        NodeType.NORMAL,
+        callerStartLineNumber,
+        callerEndLineNumber
+      )
+    );
+    visitor.addEntryToInvocationMap(
+      calleeLabel,
+      callerId,
+      invocationLineNumber
+    );
+
+    const invocationList = visitor.getInvocationMap().get(calleeLabel);
+    expect(invocationList?.get(callerId)).to.be.equal(invocationLineNumber);
+  });
+
+  test("addEntryToInvocationMap capture the first invocation only", function () {
+    const callerNodeName = "0000-MAIN-ROUTINE";
+    const callerStartLineNumber = 235;
+    const callerEndLineNumber = 256;
+    const callerId = callerStartLineNumber.toString();
+    const calleeLabel = "1000-INIT";
+    const invocationLineNumber = 240;
+    const secondInvocationLineNumber = 245;
+
+    visitor.addNode(
+      formNode(
+        callerId,
+        callerNodeName,
+        NodeType.NORMAL,
+        callerStartLineNumber,
+        callerEndLineNumber
+      )
+    );
+    visitor.addEntryToInvocationMap(
+      calleeLabel,
+      callerId,
+      invocationLineNumber
+    );
+    visitor.addEntryToInvocationMap(
+      calleeLabel,
+      callerId,
+      secondInvocationLineNumber
+    );
+
+    const invocationList = visitor.getInvocationMap().get(calleeLabel);
+    expect(invocationList?.get(callerId)).to.be.equal(invocationLineNumber);
+  });
+
+  test("addEntryToInvocationMap (invocation caller must be normal node)", function () {
+    const callerNodeName = "0000-MAIN-ROUTINE";
+    const callerStartLineNumber = 235;
+    const callerEndLineNumber = 256;
+    const callerId = callerStartLineNumber.toString();
+    const calleeLabel = "1000-INIT";
+    const invocationLineNumber = 240;
+    const loopNodeId = "400";
+
+    visitor.addNode(
+      formNode(
+        callerId,
+        callerNodeName,
+        NodeType.NORMAL,
+        callerStartLineNumber,
+        callerEndLineNumber
+      )
+    );
+    visitor.addNode(
+      formNode(
+        loopNodeId,
+        "PERFORM UNTIL SQLCODE = CC-NOT-FOUND",
+        NodeType.LOOP,
+        400,
+        400
+      )
+    );
+    visitor.addEntryToCallerCalleesMap(callerId, loopNodeId);
+    visitor.addEntryToInvocationMap(
+      calleeLabel,
+      loopNodeId,
+      invocationLineNumber
+    );
+
+    const invocationList = visitor.getInvocationMap().get(calleeLabel);
+    expect(invocationList?.get(callerId)).to.be.equal(invocationLineNumber);
   });
 
   test("the loop node data to be captured correctly for PERFORM UNTIL", function () {
@@ -698,7 +826,7 @@ suite("Tests for Control Flow Visitor", () => {
     expect(() => visitor.visitChildren(eof)).to.throw("Missing start node");
   });
 
-  test("when visitChildren get EOF, callers and callees of the node are populated correctly", function () {
+  test("when visitChildren get EOF, callers, callees and invocationMap of the node are populated correctly", function () {
     const startNode = formNode(
       "100",
       "0000-MAIN-ROUTINE",
@@ -712,8 +840,21 @@ suite("Tests for Control Flow Visitor", () => {
       "400",
       "2000-PROCESS",
       NodeType.NORMAL,
-      300,
-      400
+      400,
+      500
+    );
+
+    const invocationLineNoForNormalNode = 150;
+    const invocationLineNoForNormalNodeCallee = 350;
+    visitor.addEntryToInvocationMap(
+      normalNode.label,
+      startNode.id,
+      invocationLineNoForNormalNode
+    );
+    visitor.addEntryToInvocationMap(
+      normalNodeCallee.label,
+      normalNode.id,
+      invocationLineNoForNormalNodeCallee
     );
 
     visitor.addEntryToCallerCalleesMap(startNode.id, normalNode.label);
@@ -729,7 +870,13 @@ suite("Tests for Control Flow Visitor", () => {
     expectedStartNode.callees = [normalNode.id];
     expectedNormalNode.callers = [startNode.id];
     expectedNormalNode.callees = [normalNodeCallee.id];
+    expectedNormalNode.invocationMap = new Map<string, number>([
+      [expectedStartNode.id, invocationLineNoForNormalNode],
+    ]);
     expectedNormalNodeCallee.callers = [normalNode.id];
+    expectedNormalNodeCallee.invocationMap = new Map<string, number>([
+      [expectedNormalNode.id, invocationLineNoForNormalNodeCallee],
+    ]);
 
     expect(startNode).to.deep.equal(expectedStartNode);
     expect(normalNode).to.deep.equal(expectedNormalNode);

@@ -13,6 +13,7 @@ export class ControlFlowVisitor
   private nodes: Node[] = [];
   private callerToCalleesMap = new Map<string, string[]>();
   private calleeToCallersMap = new Map<string, string[]>();
+  private invocationMap = new Map<string, Map<string, number>>();
 
   protected defaultResult() {
     return;
@@ -44,9 +45,49 @@ export class ControlFlowVisitor
     return structuredClone(this.callerToCalleesMap);
   }
 
+  public getInvocationMap(): Map<string, Map<string, number>> {
+    return structuredClone(this.invocationMap);
+  }
+
+  public addEntryToInvocationMap(
+    nodeLabel: string,
+    caller: string,
+    invocationLineNumber: number
+  ) {
+    if (nodeLabel && invocationLineNumber) {
+      let invocationCaller = caller;
+      while (
+        invocationCaller &&
+        this.getNodes().find((n) => n.id === invocationCaller)?.type ===
+          NodeType.LOOP
+      ) {
+        invocationCaller =
+          this.getCalleeToCallersMap().get(invocationCaller)![0];
+      }
+
+      const invocationMapItem = new Map<string, number>();
+      invocationMapItem.set(invocationCaller, invocationLineNumber);
+      const invocationList = this.invocationMap.get(nodeLabel);
+      if (invocationList) {
+        if (!invocationList.has(invocationCaller)) {
+          invocationList.set(invocationCaller, invocationLineNumber);
+        }
+      } else {
+        this.invocationMap.set(nodeLabel, invocationMapItem);
+      }
+    }
+  }
+
   public addEntryToCallerCalleesMap(caller: string, callee: string) {
     if (caller && callee) {
       if (this.callerToCalleesMap.has(caller)) {
+        const lastIndex = this.callerToCalleesMap.get(caller)!.length - 1;
+        const arry: string[] = this.callerToCalleesMap.get(caller) || [];
+        const sameAsPrevCallee: boolean = arry[lastIndex] === callee;
+        if (sameAsPrevCallee) {
+          return;
+        }
+
         this.callerToCalleesMap.get(caller)?.push(callee);
       } else {
         this.callerToCalleesMap.set(caller, [callee]);
@@ -134,7 +175,9 @@ export class ControlFlowVisitor
     }
     if (caller) {
       callee = ctx.procedureName(0).text;
+
       this.addEntryToCallerCalleesMap(caller, callee);
+      this.addEntryToInvocationMap(callee, caller, ctx.start.line);
     }
 
     this.visitChildren(ctx);
@@ -235,6 +278,10 @@ export class ControlFlowVisitor
 
         child.callees = callees ? this.getIdFor(callees) : [];
         child.callers = callers ? callers : [];
+
+        if (this.getInvocationMap().has(child.label)) {
+          child.invocationMap = this.getInvocationMap().get(child.label);
+        }
       });
     }
   }

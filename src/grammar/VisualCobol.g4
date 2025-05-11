@@ -84,7 +84,7 @@ procedureDeclaratives
     ;
 
 procedureDeclarative
-    : procedureSectionHeader DOT_FS useStatement DOT_FS paragraphs
+    : procedureSectionHeader DOT_FS useStatement? DOT_FS? paragraphs
     ;
 
 genericDeclarative
@@ -111,7 +111,7 @@ paragraph
     ;
 
 paragraphExit
-    : paragraphName DOT_FS
+    : paragraphName DOT_FS?
     ;
 
 lastParagraph

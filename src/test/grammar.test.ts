@@ -38,13 +38,7 @@ suite("Visual COBOL Grammar Tests for lexer", () => {
     expect(tokens[0].type).to.equal(VisualCobolLexer.EQUALS);
   });
 
-  test("should tokenize the EQUALS token correctly in lowercase", () => {
-    const tokens = tokenize("equals");
-
-    expect(tokens[0].type).to.equal(VisualCobolLexer.EQUALS);
-  });
-
-  test("should tokenize the EQUALS token regardless of case", () => {
+  test("should tokenize the EQUALS token (case-insensitive) correctly", () => {
     const tokens = tokenize("eQuaLs");
 
     expect(tokens[0].type).to.equal(VisualCobolLexer.EQUALS);

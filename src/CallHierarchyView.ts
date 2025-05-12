@@ -22,11 +22,16 @@ export class CallHierarchyView {
         }
 
         try {
-          const cfg = await initCfg(editor, cfgMap);
-          provider.setCfg(cfg);
           const line = editor.selection.active.line;
           if (line) {
-            provider.refresh(editor.document.uri.fsPath, line);
+            provider.refresh(
+              editor.document.uri.fsPath,
+              line,
+              async (): Promise<ControlFlowGraph> => {
+                const cfg = await initCfg(editor, cfgMap);
+                return Promise.resolve(cfg);
+              }
+            );
           }
         } catch (error) {
           vscode.window.showErrorMessage("Error: " + error);
@@ -78,6 +83,7 @@ export class CallProvider implements vscode.TreeDataProvider<Item> {
     this._onDidChangeTreeData.event;
   private currentLineNumber: number = 0;
   private currentFile = "";
+  private functionForGetChildrenToCall?: () => Promise<ControlFlowGraph>;
 
   constructor(private cfg: ControlFlowGraph) {
     this.cfg = cfg;
@@ -87,9 +93,14 @@ export class CallProvider implements vscode.TreeDataProvider<Item> {
     this.cfg = cfg;
   }
 
-  refresh(file: string, currentLineNumber: number) {
+  refresh(
+    file: string,
+    currentLineNumber: number,
+    functionForGetChildrenToCall: () => Promise<ControlFlowGraph>
+  ) {
     this.currentFile = file;
     this.currentLineNumber = currentLineNumber;
+    this.functionForGetChildrenToCall = functionForGetChildrenToCall;
     this._onDidChangeTreeData.fire();
   }
 
@@ -97,19 +108,24 @@ export class CallProvider implements vscode.TreeDataProvider<Item> {
     return element;
   }
 
-  getChildren(element?: Item): Thenable<Item[]> {
-    if (this.cfg.getDisplayNodes().length === 0) {
-      return Promise.resolve([]);
-    }
-
+  async getChildren(element?: Item): Promise<Item[]> {
     if (element) {
-      return Promise.resolve(this.findChildren(element.nodeId));
+      const children = await this.findChildren(element.nodeId);
+      return Promise.resolve(children);
     } else {
+      if (this.functionForGetChildrenToCall) {
+        this.cfg = await this.functionForGetChildrenToCall();
+      }
+
+      if (this.cfg.getDisplayNodes().length === 0) {
+        return Promise.resolve([]);
+      }
+
       if (this.currentLineNumber === 0) {
         return Promise.resolve([]);
       } else {
         const lineNo = this.currentLineNumber + 1;
-        const currentItem = this.getCurrentItem(lineNo);
+        const currentItem = await this.getCurrentItem(lineNo);
         if (currentItem) {
           return Promise.resolve([currentItem]);
         }
@@ -118,10 +134,10 @@ export class CallProvider implements vscode.TreeDataProvider<Item> {
     }
   }
 
-  private findChildren(id: string): Item[] {
+  private findChildren(id: string): Promise<Item[]> {
     const parent = this.cfg.getRawNodes().find((n) => n.id === id);
     if (!parent || parent?.type === NodeType.LOOP) {
-      return [];
+      return Promise.resolve([]);
     }
 
     let node = parent;
@@ -137,7 +153,7 @@ export class CallProvider implements vscode.TreeDataProvider<Item> {
         }
 
         if (!caller) {
-          return;
+          return Promise.resolve([]);
         }
 
         const isNewChild = !children.find((c) => c.label === caller.label);
@@ -163,18 +179,18 @@ export class CallProvider implements vscode.TreeDataProvider<Item> {
       });
     }
 
-    return children;
+    return Promise.resolve(children);
   }
 
-  private getCurrentItem(lineNumber: number): Item | null {
+  private getCurrentItem(lineNumber: number): Promise<Item | null> {
     let node = this.cfg
       .getRawNodes()
       .find((n) => n.startLineNumber === lineNumber);
     if (!node || node?.type === NodeType.LOOP) {
-      return null;
+      return Promise.resolve(null);
     }
 
-    return new Item(
+    const currentItem = new Item(
       node.id,
       node.label,
       node.startLineNumber,
@@ -183,6 +199,8 @@ export class CallProvider implements vscode.TreeDataProvider<Item> {
         : vscode.TreeItemCollapsibleState.None,
       this.currentFile
     );
+
+    return Promise.resolve(currentItem);
   }
 }
 

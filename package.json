@@ -28,11 +28,6 @@
     "menus": {
       "editor/context": [
         {
-          "command": "visual-cobol-codeflow.generateGraphInMarkdown",
-          "when": "editorLangId == plaintext",
-          "group": "navigation"
-        },
-        {
           "command": "visual-cobol-codeflow.generateGraphForCodeFlowDisplay",
           "when": "editorLangId == plaintext",
           "group": "navigation"

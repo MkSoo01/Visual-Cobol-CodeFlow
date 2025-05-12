@@ -7,52 +7,79 @@ import { CallHierarchyView } from "./CallHierarchyView";
 
 function getWebviewHtml(
   mermaidGraph: string[],
-  themeKind: vscode.ColorThemeKind
+  mermaidJsUri: vscode.Uri
 ): string {
   const mermaidGraphText = mermaidGraph.join("\n");
   const textSize: number = mermaidGraphText.length;
   const maxEdges: number = mermaidGraph.length;
   console.log("textSize" + textSize);
   let theme = "default";
-  let bodyStyle = "";
 
-  if (themeKind === vscode.ColorThemeKind.Dark) {
+  if (vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark) {
     theme = "dark";
-    bodyStyle = "background-color: #121212;\n\t\tcolor: white;";
   }
 
   return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Test</title>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    </head>
-    <body style="
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          body {
             margin: 0;
             padding: 0;
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+            font-family: var(--vscode-font-family);
             display: flex;
             justify-content: center;
             align-items: center;
-            ${bodyStyle}">
-        <pre class="mermaid" style="height: 100%;
-                                    width: 100%;
-                                    margin: 0;
-                                    padding: 0;
-                                    box-sizing: border-box;
-                                    display: flex;
-                                    justify-content: center;
-                                    align-items: center;">
-          ${mermaidGraphText}
-        </pre>
+          }
 
-        <script>
-            const vscode = acquireVsCodeApi();
+          #loading-container {
+            display: flex;
+            justify-content: center;
+            padding-top: 1.5rem;
+          }
 
-            mermaid.initialize({ 
-              startOnLoad: true,
+          .spinner {
+            width: 32px;
+            height: 32px;
+            border: 4px solid var(--vscode-editorWidget-background);
+            border-top: 4px solid var(--vscode-progressBar-background);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+
+          #mermaidGraph {
+            display: none;
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            justify-content: center;
+            align-items: center;
+          }
+        </style>
+        <script src="${mermaidJsUri}"></script>
+    </head>
+    <body>
+        <div id="loading-container">
+          <div id="loading" class="spinner"></div>
+        </div>
+        <div id="mermaidGraph"></div>
+
+        <script type="module">
+          mermaid.initialize({ 
+              startOnLoad: false,
               tooltip: false,
               flowchart: { useMaxWidth: true, htmlLabels: false, curve: "basis" },
               securityLevel: "loose",
@@ -60,6 +87,28 @@ function getWebviewHtml(
               maxTextSize: ${textSize},
               maxEdges: ${maxEdges}
             });
+
+          const graphDiv = document.getElementById("mermaidGraph");
+          const drawDiagram = async (callback) => {
+            const graphDefinition = \`${mermaidGraphText}\`;
+            if (graphDefinition && graphDefinition.length > 0) {
+              const { svg, bindFunctions } = await mermaid.render(
+                "graph",
+                graphDefinition
+              );
+              graphDiv.innerHTML = svg;
+              bindFunctions?.(graphDiv);
+              setTimeout(callback, 3000);
+            }
+          };
+
+          drawDiagram(() => {
+            graphDiv.style.display = "flex";
+            document.getElementById("loading-container").style.display = "none";
+          });
+        </script>
+        <script>
+            const vscode = acquireVsCodeApi();
 
             window.focusOn = function(startLineNumber) {
               vscode.postMessage({
@@ -174,20 +223,11 @@ export async function activate(context: vscode.ExtensionContext) {
       }
 
       try {
-        const cfg = await initCfg(editor, cfgMap);
-        const mermaidGraph = cfg.getMermaidGraphForCodeFlowDisplay();
-        const htmlContent = getWebviewHtml(
-          mermaidGraph,
-          vscode.window.activeColorTheme.kind
-        );
+        let cfgData = cfgMap.get(editor.document.fileName);
+        let panel;
 
-        const cfgData = cfgMap.get(editor.document.fileName);
-        if (!cfgData) {
-          return;
-        }
-
-        if (!cfgData.webviewPanel) {
-          const panel = vscode.window.createWebviewPanel(
+        if (!cfgData || !cfgData.webviewPanel) {
+          panel = vscode.window.createWebviewPanel(
             "Visual COBOL Code-Flow",
             path.basename(editor.document.fileName),
             vscode.ViewColumn.Two,
@@ -197,7 +237,6 @@ export async function activate(context: vscode.ExtensionContext) {
               retainContextWhenHidden: false,
             }
           );
-          panel.webview.html = htmlContent;
 
           const documentUri = editor.document.uri;
           panel.webview.onDidReceiveMessage(
@@ -223,6 +262,15 @@ export async function activate(context: vscode.ExtensionContext) {
             context.subscriptions
           );
 
+          panel.webview.html = getWebviewHtml([""], documentUri);
+        } else {
+          panel = cfgData.webviewPanel;
+        }
+
+        await initCfg(editor, cfgMap);
+        cfgData = cfgMap.get(editor.document.fileName);
+        if (cfgData) {
+          cfgData.webviewPanel = panel;
           panel.onDidDispose(
             () => {
               cfgData.webviewPanel = undefined;
@@ -231,9 +279,13 @@ export async function activate(context: vscode.ExtensionContext) {
             context.subscriptions
           );
 
-          cfgData.webviewPanel = panel;
-        } else {
-          cfgData.webviewPanel.webview.html = htmlContent;
+          const mermaidGraph = cfgData.cfg.getMermaidGraphForCodeFlowDisplay();
+          const mermaidJsUri = panel.webview.asWebviewUri(
+            vscode.Uri.joinPath(context.extensionUri, "media", "mermaid.min.js")
+          );
+
+          const htmlContent = getWebviewHtml(mermaidGraph, mermaidJsUri);
+          panel.webview.html = htmlContent;
         }
       } catch (error) {
         vscode.window.showErrorMessage("Error: " + error);

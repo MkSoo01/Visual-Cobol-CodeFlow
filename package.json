@@ -2,7 +2,7 @@
   "name": "visual-cobol-codeflow",
   "displayName": "Visual COBOL CodeFlow",
   "description": "The extension designed to visualize COBOL program flow",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -29,12 +29,12 @@
       "editor/context": [
         {
           "command": "visual-cobol-codeflow.generateGraphForCodeFlowDisplay",
-          "when": "editorLangId == plaintext",
+          "when": "resourceExtname == .cbl",
           "group": "navigation"
         },
         {
           "command": "visual-cobol-codeflow.openCallHierarchy",
-          "when": "editorLangId == plaintext",
+          "when": "resourceExtname == .cbl",
           "group": "navigation"
         }
       ]

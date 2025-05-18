@@ -2,7 +2,7 @@
   "name": "visual-cobol-codeflow",
   "displayName": "Visual COBOL CodeFlow",
   "description": "The extension designed to visualize COBOL program flow",
-  "version": "0.0.5",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.96.0"
   },

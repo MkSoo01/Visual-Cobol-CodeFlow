@@ -1,18 +1,12 @@
 /*
-* Copyright (C) 2017, Ulrich Wolffgang <ulrich.wolffgang@proleap.io>
-* All rights reserved.
-*
-* This software may be modified and distributed under the terms
-* of the MIT license. See the LICENSE file for details.
-*/
-
-/*
-* Visual COBOL Grammar for ANTLR4
-*
-* This is a Visual COBOL grammar, derived from the COBOL parser at
-* https://github.com/uwol/cobol85parser.
-*
-*/
+ * Adapted from Cobol85.g4 in the ANTLR grammars-v4 project
+ * https://github.com/antlr/grammars-v4/blob/master/cobol85/Cobol85.g4
+ *
+ * Original License: BSD-3-Clause (see below)
+ * Modifications (c) 2025 MkSoo01
+ *
+ * Licensed under the BSD-3-Clause license. See LICENSE file in the project root for license information.
+ */
 
 // $antlr-format alignTrailingComments true, columnLimit 150, minEmptyLines 1, maxEmptyLinesToKeep 1, reflowComments false, useTab false
 // $antlr-format allowShortRulesOnASingleLine false, allowShortBlocksOnASingleLine true, alignSemicolons hanging, alignColons hanging

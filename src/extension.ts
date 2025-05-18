@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2025, MkSoo01
+ * All rights reserved.
+ * Licensed under the BSD-3-Clause license. See LICENSE file in the project root for license information.
+ */
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";

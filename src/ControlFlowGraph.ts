@@ -1,6 +1,10 @@
+/*
+ * Copyright (c) 2025, MkSoo01
+ * All rights reserved.
+ * Licensed under the BSD-3-Clause license. See LICENSE file in the project root for license information.
+ */
 import { ControlFlowVisitor } from "./ControlFlowVisitor";
 import { BailErrorStrategy, CharStreams, CommonTokenStream } from "antlr4ts";
-import * as fs from "fs";
 import { VisualCobolLexer } from "./generated/VisualCobolLexer";
 import { VisualCobolParser } from "./generated/VisualCobolParser";
 
@@ -148,11 +152,6 @@ export class ControlFlowGraph {
   }
 
   public initGraph(fileContent: string) {
-    // const fileContent = fs.readFileSync(filePath, "utf-8");
-    // const fileContent = fs.readFileSync(
-    //   "C:/Users/khims/source/repos/visual-cobol-codeflow/out/test/backtesting-summary.cbl",
-    //   "utf-8"
-    // );
     const inputStream = CharStreams.fromString(fileContent);
     const lexer = new VisualCobolLexer(inputStream);
     const tokenStream = new CommonTokenStream(lexer);

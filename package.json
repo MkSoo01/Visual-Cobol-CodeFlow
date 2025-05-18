@@ -66,6 +66,11 @@
     "lint": "eslint src",
     "test": "vscode-test"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MkSoo01/Visual-Cobol-CodeFlow.git"
+  },
+  "license": "BSD-3-Clause",
   "devDependencies": {
     "@types/chai": "^5.0.1",
     "@types/mocha": "^10.0.9",

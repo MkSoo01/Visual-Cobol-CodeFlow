@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2025, MkSoo01
+ * All rights reserved.
+ * Licensed under the BSD-3-Clause license. See LICENSE file in the project root for license information.
+ */
 import { ParseTree } from "antlr4ts/tree/ParseTree";
 import { TerminalNode } from "antlr4ts/tree/TerminalNode";
 import * as VisualCobolParser from "./generated/VisualCobolParser";

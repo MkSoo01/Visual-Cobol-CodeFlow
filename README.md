@@ -1,71 +1,79 @@
-# visual-cobol-codeflow README
+# Visual COBOL CodeFlow
 
-This is the README for your extension "visual-cobol-codeflow". After writing up a brief description, we recommend including the following sections.
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](./LICENSE.txt)
 
-## Features
+## Overview
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+Visual COBOL CodeFlow is a VS Code extension designed to visualize the control flow of Visual COBOL programs. It generates a graph representation of the program's control flow, making it easier to understand and analyze the code.
 
-For example if there is an image subfolder under your extension project workspace:
+> Note: Currently, this extension supports only Visual COBOL v5. Compatibility with later versions is not guaranteed.
 
-\!\[feature X\]\(images/feature-x.png\)
+## Installation
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+1. Go to the Releases section and download the latest `.vsix` file.
 
-## Requirements
+2. In VS Code, open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on macOS).
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+3. ype and select: `Extensions: Install from VSIX...`.
 
-## Extension Settings
+4. Choose the downloaded `.vsix` file.
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+5. Reload VS Code if prompted.
 
-For example:
+## Getting Started
 
-This extension contributes the following settings:
+### Control Flow View
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+![Demo of Control Flow View](assets/control-flow-view-demo.gif)
 
-## Known Issues
+1. Open a Visual COBOL File in VS Code.
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+2. To launch the Control Flow View, right-click inside the COBOL file and select "**Show Control Flow View**" from the context menu.
 
-## Release Notes
+3. The control flow graph will appear. Click on any node in the graph to scroll to the corresponding section of the COBOL code.
 
-Users appreciate release notes as you update your extension.
+> Note: The control flow graph currently does not visualize if conditions or branching logic.
 
-### 1.0.0
+### Call Hierarchy View
 
-Initial release of ...
+![Demo of Show Call Hierarchy](assets/show-call-hierarchy-demo.gif)
 
-### 1.0.1
+1. Open the Explorer View in VS Code.
 
-Fixed issue #.
+2. Open your COBOL file and place your cursor on the paragraph name you want to inspect.
 
-### 1.1.0
+3. Right-click and select "**Show Call Hierarchy**". The Call Hierarchy View will appear in the sidebar.
+   - You can expand nodes to view all the callers of the selected paragraph.
+   - Clicking on a caller will scroll to the corresponding line in the COBOL source file where it is performed.
 
-Added features X, Y, and Z.
+## Built With
 
----
+- [antlr4ts](https://github.com/tunnelvisionlabs/antlr4ts) — TypeScript parser generator for Visual COBOL grammar. The grammar file is adopted from [Cobol85.g4](https://github.com/antlr/grammars-v4/blob/master/cobol85/Cobol85.g4) written for ANTLR v4.
+- [VS Code Extension API](https://code.visualstudio.com/api) — For integration and UI
+- [Mermaid.js](https://mermaid.js.org/syntax/flowchart.html) — For rendering control flow graphs
 
-## Following extension guidelines
+## Development
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+1. Clone the Repository
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+   ```bash
+   git clone https://github.com/MkSoo01/Visual-Cobol-CodeFlow.git
+   cd Visual-Cobol-CodeFlow
+   ```
 
-## Working with Markdown
+2. Install Dependencies
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+   ```
+   npm install
+   ```
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+3. Compile the project after making changes
 
-## For more information
+   ```
+   npm run compile
+   ```
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+4. Run the Extension
+   - Open `src/extension.ts`
+   - Press `F5` to open a new Extension Development Host.
+   - In the new window, open a COBOL file to test the extension features.

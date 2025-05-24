@@ -1,10 +1,10 @@
 const chai = require("chai");
-import { VisualCobolLexer } from "../generated/VisualCobolLexer";
+import { VisualCobolLexer } from "../src/generated/VisualCobolLexer";
 import {
   GenericStatementContext,
   GenericTextContext,
   VisualCobolParser,
-} from "../generated/VisualCobolParser";
+} from "../src/generated/VisualCobolParser";
 import {
   CharStreams,
   CommonTokenStream,

@@ -5,7 +5,7 @@ import {
   Node,
   NodeType,
   DisplayNode,
-} from "../ControlFlowGraph";
+} from "../src/ControlFlowGraph";
 chai.use(sinonChai);
 const expect = chai.expect;
 

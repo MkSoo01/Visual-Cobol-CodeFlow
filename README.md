@@ -14,7 +14,7 @@ Visual COBOL CodeFlow is a VS Code extension designed to visualize the control f
 
 2. In VS Code, open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on macOS).
 
-3. ype and select: `Extensions: Install from VSIX...`.
+3. Type and select: `Extensions: Install from VSIX...`.
 
 4. Choose the downloaded `.vsix` file.
 

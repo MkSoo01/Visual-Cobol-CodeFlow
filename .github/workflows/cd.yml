@@ -13,6 +13,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install vsce
+        run: npm install -g vsce
+
       - name: Find the latest successful CI
         uses: actions/github-script@v6
         id: get_ci_run

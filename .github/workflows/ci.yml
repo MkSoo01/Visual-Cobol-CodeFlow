@@ -28,7 +28,7 @@ jobs:
       - name: Compile ANTLR grammar
         run: |
           cd src/grammar
-          antlr4ts -visitor -o ../../generated VisualCobol.g4
+          antlr4ts -visitor -o ../generated VisualCobol.g4
           cd ../..
 
       - name: Compile TypeScript

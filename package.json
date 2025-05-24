@@ -1,7 +1,8 @@
 {
   "name": "visual-cobol-codeflow",
   "displayName": "Visual COBOL CodeFlow",
-  "description": "The extension designed to visualize COBOL program flow",
+  "description": "VS Code extension to visualize and explore the control flow and call hierarchy of Visual COBOL programs",
+  "publisher": "MkSoo01",
   "version": "1.0.0",
   "engines": {
     "vscode": "^1.96.0"
@@ -61,10 +62,10 @@
     "package": "webpack --mode production --devtool hidden-source-map",
     "compile-ts": "tsc -p . --outDir out",
     "compile-antlr": "antlr4ts -visitor -o src/generated/ src/grammar/VisualCobol.g4",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "watch-tests": "tsc -p ./tsconfig.test.json -w --outDir out",
+    "compile-tests": "tsc -p ./tsconfig.test.json --outDir out",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "npm run compile-tests && vscode-test"
   },
   "repository": {
     "type": "git",

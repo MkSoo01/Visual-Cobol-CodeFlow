@@ -13,12 +13,12 @@ import {
   ProcedureNameContext,
   SentenceContext,
   StatementContext,
-} from "../generated/VisualCobolParser";
-import { ControlFlowVisitor } from "../ControlFlowVisitor";
+} from "../src/generated/VisualCobolParser";
+import { ControlFlowVisitor } from "../src/ControlFlowVisitor";
 import { ParserRuleContext, Token } from "antlr4ts";
 import sinon from "sinon";
 import { TerminalNode } from "antlr4ts/tree/TerminalNode";
-import { NodeType, Node } from "../ControlFlowGraph";
+import { NodeType, Node } from "../src/ControlFlowGraph";
 
 chai.use(sinonChai);
 const expect = chai.expect;

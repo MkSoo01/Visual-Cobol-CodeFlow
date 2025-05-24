@@ -28,23 +28,28 @@ jobs:
             }
             return runs.data.workflow_runs[0].id;
 
+      - name: Get name and version from package.json
+        id: pkg
+        run: |
+          NAME=$(jq -r .name package.json)
+          VERSION=$(jq -r .version package.json)
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Download artifact
         run: |
           RUN_ID=${{ steps.get_ci_run.outputs.result }}
           ARTIFACTS_JSON=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts)
 
-          ARTIFACT_URL=$(echo "$ARTIFACTS_JSON" | jq -r '.artifacts[] | select(.name=="visual-cobol-codeflow") | .archive_download_url')
+          ARTIFACT_URL=$(echo "$ARTIFACTS_JSON" | jq -r '.artifacts[] | select(.name=="${{ steps.pkg.outputs.name }}-${{ steps.pkg.outputs.version }}") | .archive_download_url')
 
           curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o artifact.zip "$ARTIFACT_URL"
           unzip artifact.zip
 
       - name: Publish to VS Code Marketplace
         run: |
-          TAG_NAME=${{ github.ref_name }}
-          echo "Tag is $TAG_NAME"
-          mv out/visual-cobol-codeflow.vsix out/visual-cobol-codeflow-$TAG_NAME.vsix
-          vsce publish --pat ${{ secrets.VSCE_TOKEN }} --packagePath out/visual-cobol-codeflow-$TAG_NAME.vsix
+          vsce publish --pat ${{ secrets.VSCE_TOKEN }} --packagePath ${{ steps.pkg.outputs.name }}-${{ steps.pkg.outputs.version }}.vsix
 
       - name: Create GitHub Release and upload .vsix
         uses: softprops/action-gh-release@v2

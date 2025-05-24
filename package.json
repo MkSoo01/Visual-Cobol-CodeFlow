@@ -2,6 +2,7 @@
   "name": "visual-cobol-codeflow",
   "displayName": "Visual COBOL CodeFlow",
   "description": "VS Code extension to visualize and explore the control flow and call hierarchy of Visual COBOL programs",
+  "icon": "images/icon.png",
   "publisher": "MkSoo01",
   "version": "1.0.0",
   "engines": {

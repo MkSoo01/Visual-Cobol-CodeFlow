@@ -1,7 +1,8 @@
 {
   "name": "visual-cobol-codeflow",
   "displayName": "Visual COBOL CodeFlow",
-  "description": "The extension designed to visualize COBOL program flow",
+  "description": "VS Code extension to visualize and explore the control flow and call hierarchy of Visual COBOL programs",
+  "publisher": "MkSoo01",
   "version": "1.0.0",
   "engines": {
     "vscode": "^1.96.0"

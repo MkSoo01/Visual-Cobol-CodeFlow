@@ -25,6 +25,9 @@ jobs:
       - name: Install antlr4ts CLI
         run: npm install -g antlr4ts-cli
 
+      - name: Install vsce
+        run: npm install -g vsce
+
       - name: Compile ANTLR grammar
         run: |
           cd src/grammar
@@ -40,5 +43,11 @@ jobs:
       - name: Run tests (with Xvfb)
         run: xvfb-run -a npm run test
 
-      - name: Build with Webpack
-        run: npm run package
+      - name: Package VS Code extension (build with Webpack)
+        run: vsce package
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-cobol-codeflow
+          path: ./out/visual-cobol-codeflow.vsix

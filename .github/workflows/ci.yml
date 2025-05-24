@@ -46,8 +46,16 @@ jobs:
       - name: Package VS Code extension (build with Webpack)
         run: vsce package
 
+      - name: Get name and version from package.json
+        id: pkg
+        run: |
+          NAME=$(jq -r .name package.json)
+          VERSION=$(jq -r .version package.json)
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
           name: visual-cobol-codeflow
-          path: ./out/visual-cobol-codeflow.vsix
+          path: ${{ steps.pkg.outputs.name }}-${{ steps.pkg.outputs.version }}.vsix

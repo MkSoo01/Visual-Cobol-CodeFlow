@@ -56,10 +56,3 @@ jobs:
       - name: Publish to VS Code Marketplace
         run: |
           vsce publish --pat ${{ secrets.VSCE_TOKEN }} --packagePath ${{ steps.pkg.outputs.name }}-${{ steps.pkg.outputs.version }}.vsix
-
-      - name: Create GitHub Release and upload .vsix
-        uses: softprops/action-gh-release@v2
-        with:
-          files: "*.vsix"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

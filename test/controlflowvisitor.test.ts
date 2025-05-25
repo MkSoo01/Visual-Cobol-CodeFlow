@@ -10,6 +10,7 @@ import {
   PerformTypeContext,
   PerformUntilContext,
   PerformVaryingContext,
+  ProcedureDivisionBodyContext,
   ProcedureNameContext,
   SentenceContext,
   StatementContext,
@@ -214,6 +215,7 @@ suite("Tests for Control Flow Visitor", () => {
       expectedStartLineNumber,
       expectedEndLineNumber
     );
+    setParent(stubCtx, sinon.createStubInstance(ProcedureDivisionBodyContext));
 
     visitor.visitParagraph(stubCtx);
 

@@ -1,24 +1,12 @@
-# Visual COBOL CodeFlow
+# COBOL CodeFlow
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](./LICENSE.txt)
 
 ## Overview
 
-Visual COBOL CodeFlow is a VS Code extension designed to visualize the control flow of Visual COBOL programs. It generates a graph representation of the program's control flow, making it easier to understand and analyze the code.
+COBOL CodeFlow is a VS Code extension designed to visualize the control flow of Visual COBOL programs. It generates a graph representation of the program’s control flow and provides a call hierarchy view, making it easier to understand and analyze complex code structures.
 
-> Note: Currently, this extension supports only Visual COBOL v5. Compatibility with later versions is not guaranteed.
-
-## Installation
-
-1. Go to the Releases section and download the latest `.vsix` file.
-
-2. In VS Code, open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on macOS).
-
-3. Type and select: `Extensions: Install from VSIX...`.
-
-4. Choose the downloaded `.vsix` file.
-
-5. Reload VS Code if prompted.
+> ⚠️ Note: This extension was developed and tested using Visual COBOL v5. Support for other COBOL versions or dialects has not been verified and may not work as expected.
 
 ## Getting Started
 
@@ -32,7 +20,7 @@ Visual COBOL CodeFlow is a VS Code extension designed to visualize the control f
 
 3. The control flow graph will appear. Click on any node in the graph to scroll to the corresponding section of the COBOL code.
 
-> Note: The control flow graph currently does not visualize if conditions or branching logic.
+> Note: The control flow graph currently does not visualize if conditions logic.
 
 ### Call Hierarchy View
 

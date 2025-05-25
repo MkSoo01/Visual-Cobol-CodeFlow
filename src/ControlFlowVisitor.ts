@@ -128,7 +128,7 @@ export class ControlFlowVisitor
     };
   }
 
-  private getAncestor(ctx: ParserRuleContext): string {
+  private findCaller(ctx: ParserRuleContext): string {
     let currentCtx: ParserRuleContext | undefined = ctx.parent;
     while (
       currentCtx &&
@@ -143,6 +143,18 @@ export class ControlFlowVisitor
     return currentCtx ? currentCtx.start.line.toString() : "";
   }
 
+  private isEntryPoint(ctx: VisualCobolParser.ParagraphContext): boolean {
+    let currentCtx: ParserRuleContext | undefined = ctx.parent;
+    while (
+      currentCtx &&
+      !(currentCtx instanceof VisualCobolParser.ProcedureDivisionBodyContext)
+    ) {
+      currentCtx = currentCtx.parent;
+    }
+
+    return currentCtx ? true : false;
+  }
+
   visitParagraph(ctx: VisualCobolParser.ParagraphContext): void {
     let node: Node = this.formNode(
       ctx.start.line.toString(),
@@ -154,7 +166,10 @@ export class ControlFlowVisitor
 
     this.addNode(node);
 
-    if (ctx.paragraphName().text?.startsWith("0000-MAIN-ROUTINE")) {
+    if (
+      this.getNodes().find((n) => n.type === NodeType.START) === undefined &&
+      this.isEntryPoint(ctx)
+    ) {
       node.type = NodeType.START;
     }
 
@@ -176,7 +191,7 @@ export class ControlFlowVisitor
     if (ctx.performType()) {
       caller = this.addLoopNode(ctx);
     } else {
-      caller = this.getAncestor(ctx);
+      caller = this.findCaller(ctx);
     }
     if (caller) {
       callee = ctx.procedureName(0).text;
@@ -221,9 +236,9 @@ export class ControlFlowVisitor
         ctx.stop ? ctx.stop.line : ctx.start.line
       );
 
-      const ancestor = this.getAncestor(ctx);
-      if (ancestor) {
-        this.addEntryToCallerCalleesMap(ancestor, loopNode.id);
+      const caller = this.findCaller(ctx);
+      if (caller) {
+        this.addEntryToCallerCalleesMap(caller, loopNode.id);
       }
 
       this.addNode(loopNode);
